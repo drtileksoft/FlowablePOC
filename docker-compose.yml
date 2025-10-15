@@ -1,0 +1,78 @@
+services:
+  db:
+    image: postgres:15
+    container_name: flowable-db
+    platform: linux/arm64/v8   # Postgres je multi-arch, na Macu běží nativně
+    environment:
+      POSTGRES_DB: flowable
+      POSTGRES_USER: flowable
+      POSTGRES_PASSWORD: flowable
+      TZ: Europe/Prague
+    ports:
+      - "5432:5432"
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowable -d flowable"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  flowable-rest:
+    image: flowable/flowable-rest:7.2.0
+    container_name: flowable-rest
+    platform: linux/amd64          # <<< emulace x86_64
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/flowable
+      SPRING_DATASOURCE_USERNAME: flowable
+      SPRING_DATASOURCE_PASSWORD: flowable
+      SERVER_PORT: 8080
+      TZ: Europe/Prague
+
+      # Volitelné: vynucení REST uživatele (kdyby default nebyl vytvořen)
+      FLOWABLE_REST_APP_ADMIN_USER_ID: rest-admin
+      FLOWABLE_REST_APP_ADMIN_PASSWORD: test
+      FLOWABLE_REST_APP_ADMIN_FIRST_NAME: Rest
+      FLOWABLE_REST_APP_ADMIN_LAST_NAME: Admin
+    ports:
+      - "8090:8080"
+    volumes:
+      - ./addons:/additional-classpath:ro
+    # Zjednodušený healthcheck: pouze TCP (bez curl/wget)
+    healthcheck:
+      test: ["CMD-SHELL", "sh -c 'exec 3<>/dev/tcp/127.0.0.1/8080'"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+
+  flowable-http-worker:
+    build: .
+    image: flowable-http-worker:latest
+    environment:
+      FLOWABLE__BASEURL: "http://flowable-rest:8080/flowable-rest/external-job-api"
+      FLOWABLE__USER: "rest-admin"
+      FLOWABLE__PASS: "test"
+      FLOWABLE__TOPIC: "srd.call"
+      FLOWABLE__WORKERID: "flowable-http-worker-1"
+      FLOWABLE__LOCKDURATION: "PT30S"
+      FLOWABLE__MAXJOBSPERTICK: "10"
+      FLOWABLE__POLLPERIODSECONDS: "2"
+      FLOWABLE__MAXDEGREEOFPARALLELISM: "4"
+      SRD__URL: "https://httplogapi.azurewebsites.net/api/events"
+      SRD__IDENTIFIER: "FLOWABLE_POC_WORKER"
+      SRD__HTTPTIMEOUTSECONDS: "10"
+      WINDOWS__TIMEZONE: "Europe/Prague"
+      WINDOWS__PAUSEFROMHOUR: "14"
+      WINDOWS__PAUSETOHOUREXCLUSIVE: "15"
+      RETRY__INITIALDELAYSECONDS: "60"
+      RETRY__MAXDELAYSECONDS: "900"
+      RETRY__JITTERSECONDS: "5"
+      ALLOWINSECURESSL: "true"
+      WORKER__LOGLEVEL: "Debug"
+    restart: unless-stopped
+
+volumes:
+  dbdata:

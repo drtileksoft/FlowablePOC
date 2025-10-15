@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions
+    xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+    xmlns:flowable="http://flowable.org/bpmn"
+    targetNamespace="http://flowable.org/bpmn">
+    <process id="srdProcess" name="SRD External Task Process" isExecutable="true">
+        <startEvent id="startEvent">
+            <timerEventDefinition>
+                <timeCycle>0 * * * * ?</timeCycle>
+            </timerEventDefinition>
+        </startEvent>
+        <serviceTask id="externalTask" name="External SRD Task"
+                     flowable:type="external"
+                     flowable:topic="srd.call"
+                     flowable:async="true" />
+        <endEvent id="endEvent" />
+        <sequenceFlow sourceRef="startEvent" targetRef="externalTask" />
+        <sequenceFlow sourceRef="externalTask" targetRef="endEvent" />
+    </process>
+</definitions>
