@@ -153,7 +153,7 @@ public sealed class ExternalWorkerService : BackgroundService
                 // Pauza v okně
                 if (hour >= pauseFrom && hour < pauseToExcl)
                 {
-                    _log.LogDebug("Paused by window {From}-{To} localTime={Now}", pauseFrom, pauseToExcl, nowLocal.ToString("HH:mm:ss"));
+                    _log.LogInformation("Paused by window {From}-{To} localTime={Now}", pauseFrom, pauseToExcl, nowLocal.ToString("HH:mm:ss"));
                     await Task.Delay(TimeSpan.FromSeconds(pollSec), stoppingToken);
                     continue;
                 }
@@ -161,7 +161,7 @@ public sealed class ExternalWorkerService : BackgroundService
                 // Acquire
                 var req = new AcquireRequest(workerId, maxJobs, lockDuration, topic, fetchVariables: true);
                 var json = JsonSerializer.Serialize(req);
-                _log.LogDebug("Acquire request: {Json}", json);
+                _log.LogInformation("Acquire request: {Json}", json);
                 using var acqBody = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var swAcquire = Stopwatch.StartNew();
@@ -259,7 +259,7 @@ public sealed class ExternalWorkerService : BackgroundService
 
             var sw = Stopwatch.StartNew();
             using var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            _log.LogDebug("Calling SRD... url={Url}", srdUrl);
+            _log.LogInformation("Calling SRD... url={Url}", srdUrl);
 
             using var resp = await srd.PostAsync(srdUrl, content, ct);
             sw.Stop();
