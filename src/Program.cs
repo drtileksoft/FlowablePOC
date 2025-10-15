@@ -59,6 +59,13 @@ builder.Services.AddHttpClient("srd", (sp, c) =>
 })
 .ConfigurePrimaryHttpMessageHandler(_ => InsecureHandler() ?? new HttpClientHandler());
 
+// ---- Hosted service orchestration ----
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.ServicesStartConcurrently = true;
+    options.ServicesStopConcurrently = true;
+});
+
 // ---- Workers ----
 var workerOptions = builder.Configuration
     .GetSection("Flowable:Workers")
