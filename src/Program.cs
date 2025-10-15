@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http.Headers;
 using System.Diagnostics;
 using System.Text;
@@ -57,8 +59,22 @@ builder.Services.AddHttpClient("srd", (sp, c) =>
 })
 .ConfigurePrimaryHttpMessageHandler(_ => InsecureHandler() ?? new HttpClientHandler());
 
-// ---- Worker ----
-builder.Services.AddHostedService<ExternalWorkerService>();
+// ---- Workers ----
+var workerOptions = builder.Configuration
+    .GetSection("Flowable:Workers")
+    .Get<List<WorkerOptions>>()
+    ?? new List<WorkerOptions>();
+
+if (workerOptions.Count == 0)
+{
+    workerOptions.Add(WorkerOptions.FromLegacy(builder.Configuration));
+}
+
+foreach (var options in workerOptions)
+{
+    builder.Services.AddSingleton<IHostedService>(sp =>
+        ActivatorUtilities.CreateInstance<ExternalWorkerService>(sp, options));
+}
 
 await builder.Build().RunAsync();
 
@@ -67,9 +83,15 @@ public sealed class ExternalWorkerService : BackgroundService
     private readonly IHttpClientFactory _http;
     private readonly IConfiguration _cfg;
     private readonly ILogger<ExternalWorkerService> _log;
+    private readonly WorkerOptions _options;
 
-    public ExternalWorkerService(IHttpClientFactory http, IConfiguration cfg, ILogger<ExternalWorkerService> log)
+    public ExternalWorkerService(
+        WorkerOptions options,
+        IHttpClientFactory http,
+        IConfiguration cfg,
+        ILogger<ExternalWorkerService> log)
     {
+        _options = options ?? throw new ArgumentNullException(nameof(options));
         _http = http;
         _cfg = cfg;
         _log = log;
@@ -94,15 +116,15 @@ public sealed class ExternalWorkerService : BackgroundService
         int pauseFrom = int.Parse(_cfg["Windows:PauseFromHour"] ?? "14");
         int pauseToExcl = int.Parse(_cfg["Windows:PauseToHourExclusive"] ?? "15");
 
-        var topic = _cfg["Flowable:Topic"] ?? "srd.call";
-        var workerId = _cfg["Flowable:WorkerId"] ?? "srd-worker-1";
-        var lockDuration = _cfg["Flowable:LockDuration"] ?? "PT30S";
-        int maxJobs = int.Parse(_cfg["Flowable:MaxJobsPerTick"] ?? "5");
-        int pollSec = int.Parse(_cfg["Flowable:PollPeriodSeconds"] ?? "3");
-        int mdop = int.Parse(_cfg["Flowable:MaxDegreeOfParallelism"] ?? "2");
+        var topic = _options.Topic ?? _cfg["Flowable:Topic"] ?? "srd.call";
+        var workerId = _options.WorkerId ?? _cfg["Flowable:WorkerId"] ?? "srd-worker-1";
+        var lockDuration = _options.LockDuration ?? _cfg["Flowable:LockDuration"] ?? "PT30S";
+        int maxJobs = _options.MaxJobsPerTick ?? int.Parse(_cfg["Flowable:MaxJobsPerTick"] ?? "5");
+        int pollSec = _options.PollPeriodSeconds ?? int.Parse(_cfg["Flowable:PollPeriodSeconds"] ?? "3");
+        int mdop = _options.MaxDegreeOfParallelism ?? int.Parse(_cfg["Flowable:MaxDegreeOfParallelism"] ?? "2");
 
-        var srdUrl = _cfg["SRD:Url"] ?? throw new("SRD:Url missing");
-        var identifier = _cfg["SRD:Identifier"] ?? "FLOWABLE_POC_WORKER";
+        var srdUrl = _options.TargetUrl ?? _cfg["SRD:Url"] ?? throw new("SRD:Url missing");
+        var identifier = _options.Identifier ?? _cfg["SRD:Identifier"] ?? "FLOWABLE_POC_WORKER";
         bool insecure = _cfg.GetValue("AllowInsecureSsl", false);
 
         var flowable = _http.CreateClient("flowable");
@@ -164,7 +186,7 @@ public sealed class ExternalWorkerService : BackgroundService
 
                 // Zpracování s omezeným paralelismem
                 using var throttler = new SemaphoreSlim(mdop);
-                var tasks = jobs.Select(job => ProcessJob(job, throttler, flowable, srd, identifier, rnd, stoppingToken)).ToList();
+                var tasks = jobs.Select(job => ProcessJob(job, throttler, flowable, srd, identifier, workerId, srdUrl, rnd, stoppingToken)).ToList();
                 await Task.WhenAll(tasks);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -188,6 +210,8 @@ public sealed class ExternalWorkerService : BackgroundService
         HttpClient flowable,
         HttpClient srd,
         string identifier,
+        string workerId,
+        string srdUrl,
         Random rnd,
         CancellationToken ct)
     {
@@ -203,6 +227,13 @@ public sealed class ExternalWorkerService : BackgroundService
         try
         {
             var clientTs = DateTimeOffset.Now.ToString("o");
+            object? forwarded = null;
+            if (!string.IsNullOrWhiteSpace(_options.InputVariable) &&
+                job.VariablesAsDictionary.TryGetValue(_options.InputVariable!, out var forwardedValue))
+            {
+                forwarded = forwardedValue;
+            }
+
             var payload = new
             {
                 id = identifier,
@@ -214,35 +245,45 @@ public sealed class ExternalWorkerService : BackgroundService
                     topic = job.topic,
                     pi = job.processInstanceId,
                     exec = job.executionId,
-                    variables = job.VariablesAsDictionary
+                    variables = job.VariablesAsDictionary,
+                    forwardedResult = forwarded
                 }
             };
 
             var sw = Stopwatch.StartNew();
             using var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-            _log.LogDebug("Calling SRD... url={Url}", _cfg["SRD:Url"]);
+            _log.LogDebug("Calling SRD... url={Url}", srdUrl);
 
-            using var resp = await srd.PostAsync(_cfg["SRD:Url"]!, content, ct);
+            using var resp = await srd.PostAsync(srdUrl, content, ct);
             sw.Stop();
 
             if (!resp.IsSuccessStatusCode)
             {
                 var backoff = BackoffSeconds(rnd);
                 _log.LogWarning("SRD call failed: status={Status} elapsedMs={Elapsed} backoff={Backoff}s", (int)resp.StatusCode, sw.ElapsedMilliseconds, backoff);
-                await FailWithRetry(flowable, job.id, _cfg["Flowable:WorkerId"]!, backoff, ct);
+                await FailWithRetry(flowable, job.id, workerId, backoff, ct);
                 return;
             }
 
             _log.LogInformation("SRD call OK: status={Status} elapsedMs={Elapsed}", (int)resp.StatusCode, sw.ElapsedMilliseconds);
 
+            var responseBody = await resp.Content.ReadAsStringAsync(ct);
+
+            var variableList = new List<object>
+            {
+                new { name = "srdStatus", value = "OK" },
+                new { name = "srdClientTs", value = clientTs }
+            };
+
+            if (!string.IsNullOrWhiteSpace(_options.ResultVariable))
+            {
+                variableList.Add(new { name = _options.ResultVariable!, value = responseBody });
+            }
+
             var completePayload = new
             {
-                workerId = _cfg["Flowable:WorkerId"],
-                variables = new[]
-                {
-                    new { name = "srdStatus", value = "OK" },
-                    new { name = "srdClientTs", value = clientTs }
-                }
+                workerId,
+                variables = variableList
             };
 
             using var completeContent = new StringContent(JsonSerializer.Serialize(completePayload), Encoding.UTF8, "application/json");
@@ -262,7 +303,7 @@ public sealed class ExternalWorkerService : BackgroundService
             _log.LogError(ex, "Local error while processing job. Will fail+retry with 60s.");
             try
             {
-                await FailWithRetry(flowable, job.id, _cfg["Flowable:WorkerId"]!, 60, ct);
+                await FailWithRetry(flowable, job.id, workerId, 60, ct);
             }
             catch (Exception ex2)
             {
@@ -300,4 +341,34 @@ public sealed class ExternalWorkerService : BackgroundService
 
     private LogLevel GetMinLogLevel()
         => (LogLevel)Enum.Parse(typeof(LogLevel), Environment.GetEnvironmentVariable("WORKER__LOGLEVEL") ?? "Information", true);
+}
+
+public sealed record WorkerOptions
+{
+    public string? Topic { get; init; }
+    public string? WorkerId { get; init; }
+    public string? LockDuration { get; init; }
+    public int? MaxJobsPerTick { get; init; }
+    public int? PollPeriodSeconds { get; init; }
+    public int? MaxDegreeOfParallelism { get; init; }
+    public string? TargetUrl { get; init; }
+    public string? Identifier { get; init; }
+    public string? ResultVariable { get; init; }
+    public string? InputVariable { get; init; }
+
+    public static WorkerOptions FromLegacy(IConfiguration cfg)
+    {
+        return new WorkerOptions
+        {
+            Topic = cfg["Flowable:Topic"] ?? "srd.call",
+            WorkerId = cfg["Flowable:WorkerId"] ?? "srd-worker-1",
+            LockDuration = cfg["Flowable:LockDuration"],
+            MaxJobsPerTick = cfg.GetValue<int?>("Flowable:MaxJobsPerTick"),
+            PollPeriodSeconds = cfg.GetValue<int?>("Flowable:PollPeriodSeconds"),
+            MaxDegreeOfParallelism = cfg.GetValue<int?>("Flowable:MaxDegreeOfParallelism"),
+            TargetUrl = cfg["SRD:Url"],
+            Identifier = cfg["SRD:Identifier"],
+            ResultVariable = cfg["Flowable:ResultVariable"] ?? "srdCallResult"
+        };
+    }
 }

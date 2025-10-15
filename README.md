@@ -40,3 +40,36 @@ curl -u rest-admin:test "http://localhost:8090/flowable-rest/service/runtime/pro
 
 # swagger
 http://localhost:8090/flowable-rest/docs/?url=specfile/external-worker/flowable-swagger-external-worker.json#/Acquire_and_Execute
+## External worker sequencing example
+
+Flowable waits for an external service task to be completed (via the `/acquire/jobs/{id}/complete` REST call) before it continues to the next step in the process. That means you can model two consecutive external tasks and the second one will only be acquired after the worker finished the first one successfully.
+
+```xml
+<serviceTask id="externalTask" name="External SRD Task"
+             flowable:type="external"
+             flowable:topic="srd.call"
+             flowable:async="true" />
+<serviceTask id="externalTask2" name="External SRD Task 2"
+             flowable:type="external"
+             flowable:topic="srd.call"
+             flowable:async="true" />
+```
+
+If you need to model explicit waiting (for example when the worker calls an external system asynchronously and you want to resume the process later), you can set a process variable when completing the job and use an exclusive gateway or intermediate catching event to loop until the flag indicates that the work is finished.
+
+```xml
+<serviceTask id="externalTask" ... />
+<exclusiveGateway id="waitForWorker" />
+<sequenceFlow sourceRef="waitForWorker" targetRef="externalTask" >
+  <conditionExpression xsi:type="tFormalExpression">
+    <![CDATA[${srdStatus != 'OK'}]]>
+  </conditionExpression>
+</sequenceFlow>
+<sequenceFlow sourceRef="waitForWorker" targetRef="externalTask2" >
+  <conditionExpression xsi:type="tFormalExpression">
+    <![CDATA[${srdStatus == 'OK'}]]>
+  </conditionExpression>
+</sequenceFlow>
+```
+
+The worker sample in `src/Program.cs` already calls `acquire/jobs/{job.id}/complete`, which is exactly what Flowable requires in order to move the execution token past the external task. If the worker fails instead, calling `acquire/jobs/{job.id}/fail` will release the lock and allow the engine to retry the same task.

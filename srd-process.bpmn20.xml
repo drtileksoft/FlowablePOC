@@ -13,8 +13,13 @@
                      flowable:type="external"
                      flowable:topic="srd.call"
                      flowable:async="true" />
+        <serviceTask id="externalTask2" name="External SRD Task 2"
+                     flowable:type="external"
+                     flowable:topic="srd2.call"
+                     flowable:async="true" />
         <endEvent id="endEvent" />
         <sequenceFlow sourceRef="startEvent" targetRef="externalTask" />
-        <sequenceFlow sourceRef="externalTask" targetRef="endEvent" />
+        <sequenceFlow sourceRef="externalTask" targetRef="externalTask2" />
+        <sequenceFlow sourceRef="externalTask2" targetRef="endEvent" />
     </process>
 </definitions>
