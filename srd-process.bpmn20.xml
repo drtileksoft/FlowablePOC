@@ -9,14 +9,21 @@
                 <timeCycle>0 * * * * ?</timeCycle>
             </timerEventDefinition>
         </startEvent>
+
+        <!-- Script Task: nastaví InitPayload na JSON řetězec -->
+        <scriptTask id="initPayloadTask" name="Init payload" scriptFormat="groovy">
+        <script><![CDATA[
+            def json = '{"data":{"hello":"flow"}}'
+            execution.setVariable('InitPayload', json)
+        ]]></script>
+        </scriptTask>
+
         <serviceTask id="externalTask" name="External SRD Task"
                      flowable:type="external-worker"
                      flowable:topic="srd.call"
                      flowable:async="true">
                 <extensionElements>
-                    <flowable:externalWorkerInParameter target="JsonPayload">
-                        <flowable:sourceExpression><![CDATA['{"data":{"hello":"flow"}}']]></flowable:sourceExpression>
-                    </flowable:externalWorkerInParameter>
+                    <flowable:externalWorkerInParameter source="InitPayload" target="JsonPayload"></flowable:externalWorkerInParameter>
                     <!-- Worker musí na COMPLETE vrátit job-proměnnou JsonResponsePayload (ideálně type=json).
                         Tady ji mapujeme do procesní proměnné SrdCall1result -->
                     <flowable:externalWorkerOutParameter source="JsonResponsePayload" target="SrdCall1result"></flowable:externalWorkerOutParameter>
@@ -34,7 +41,8 @@
                 </extensionElements>
         </serviceTask>
         <endEvent id="endEvent" />
-        <sequenceFlow sourceRef="startEvent" targetRef="externalTask" />
+        <sequenceFlow sourceRef="startEvent" targetRef="initPayloadTask"/>
+        <sequenceFlow sourceRef="initPayloadTask" targetRef="externalTask"/>
         <sequenceFlow sourceRef="externalTask" targetRef="externalTask2" />
         <sequenceFlow sourceRef="externalTask2" targetRef="endEvent" />
     </process>

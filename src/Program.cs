@@ -113,13 +113,75 @@ public sealed class ExternalWorkerService : BackgroundService
 
     private record AcquireRequest(string workerId, int maxJobs, string lockDuration, string topic, bool fetchVariables = true);
     private record Variable(string name, object value, string type);
+
+
+    /*
+     * [
+  {
+    "id": "196c5fa3-aa7a-11f0-b5fc-2ef252b3fdd9",
+    "url": "http://localhost:8090/flowable-rest/external-job-api/jobs/196c5fa3-aa7a-11f0-b5fc-2ef252b3fdd9",
+    "correlationId": "196c5fa2-aa7a-11f0-b5fc-2ef252b3fdd9",
+    "processInstanceId": "195ccf39-aa7a-11f0-b5fc-2ef252b3fdd9",
+    "processDefinitionId": "srdProcess:1:7122b52a-aa79-11f0-b5fc-2ef252b3fdd9",
+    "executionId": "195ccf3a-aa7a-11f0-b5fc-2ef252b3fdd9",
+    "scopeId": null,
+    "subScopeId": null,
+    "scopeDefinitionId": null,
+    "scopeType": null,
+    "elementId": "externalTask",
+    "elementName": "External SRD Task",
+    "retries": 3,
+    "exceptionMessage": null,
+    "dueDate": null,
+    "createTime": "2025-10-16T10:23:03.775Z",
+    "tenantId": "",
+    "lockOwner": "flowable-http-worker-1",
+    "lockExpirationTime": "2025-10-16T10:26:18.823Z",
+    "variables": []
+  }
+]
+     */
+
     private record AcquiredJob(
-        string id, string topic, string lockExpirationTime, string createTime,
-        string executionId, string processInstanceId, string processDefinitionId,
-        string? tenantId, string? elementId, List<Variable>? variables)
+    string id,
+    string url,
+    string correlationId,
+    string processInstanceId,
+    string processDefinitionId,
+    string executionId,
+    string? scopeId,
+    string? subScopeId,
+    string? scopeDefinitionId,
+    string? scopeType,
+    string elementId,
+    string elementName,
+    int retries,
+    string? exceptionMessage,
+    string? dueDate,              // ISO8601 nebo null (např. "2025-10-16T10:23:03.775Z")
+    string createTime,            // ISO8601 (např. "2025-10-16T10:23:03.775Z")
+    string tenantId,
+    string? lockOwner,
+    string lockExpirationTime,    // ISO8601 (např. "2025-10-16T10:26:18.823Z")
+    List<Variable>? variables
+)
     {
+        // Pohodlný převod proměnných jobu na dictionary
         public Dictionary<string, object> VariablesAsDictionary =>
-            variables?.ToDictionary(v => v.name, v => v.value) ?? new Dictionary<string, object>();
+            variables?.ToDictionary(v => v.name, v => v.value) ?? new();
+
+        // Volitelné: parsované časy (když se hodí)
+        public DateTimeOffset? CreateTimeParsed =>
+            DateTimeOffset.TryParse(createTime, out var dto) ? dto : null;
+
+        public DateTimeOffset? LockExpirationParsed =>
+            DateTimeOffset.TryParse(lockExpirationTime, out var dto) ? dto : null;
+
+        public DateTimeOffset? DueDateParsed =>
+            !string.IsNullOrWhiteSpace(dueDate) && DateTimeOffset.TryParse(dueDate, out var dto) ? dto : null;
+
+        // Je (ještě) zamknutý?
+        public bool IsLocked(DateTimeOffset nowUtc) =>
+            LockExpirationParsed is { } exp && exp > nowUtc;
     }
 
     private sealed record CompleteVariable(string name, object? value, string? type = null);
@@ -233,16 +295,14 @@ public sealed class ExternalWorkerService : BackgroundService
         {
             ["jobId"] = job.id,
             ["pi"] = job.processInstanceId,
-            ["exec"] = job.executionId,
-            ["topic"] = job.topic
+            ["exec"] = job.executionId
         });
 
         try
         {
             var clientTs = DateTimeOffset.Now.ToString("o");
             object? forwarded = null;
-            if (!string.IsNullOrWhiteSpace(_options.InputVariable) &&
-                job.VariablesAsDictionary.TryGetValue(_options.InputVariable!, out var forwardedValue))
+            if (job.VariablesAsDictionary.TryGetValue("JsonPayload", out var forwardedValue))
             {
                 forwarded = forwardedValue;
             }
@@ -255,7 +315,6 @@ public sealed class ExternalWorkerService : BackgroundService
                 {
                     note = "external-worker",
                     jobId = job.id,
-                    topic = job.topic,
                     pi = job.processInstanceId,
                     exec = job.executionId,
                     variables = job.VariablesAsDictionary,
@@ -282,7 +341,7 @@ public sealed class ExternalWorkerService : BackgroundService
 
             var responseBody = await resp.Content.ReadAsStringAsync(ct);
 
-            var elementIdentifier = string.IsNullOrWhiteSpace(job.elementId) ? job.topic : job.elementId!;
+            var elementIdentifier = job.elementId!;
             var contentType = resp.Content.Headers.ContentType?.MediaType;
             var trimmed = responseBody.Trim();
 
@@ -318,20 +377,13 @@ public sealed class ExternalWorkerService : BackgroundService
 
             var variableList = new List<CompleteVariable>
             {
-                new("srdStatus", "OK", "string"),
-                new("srdClientTs", clientTs, "string"),
                 new($"{elementIdentifier}_statusCode", (int)resp.StatusCode, "integer"),
                 new($"{elementIdentifier}_response_type", responseType, "string"),
                 new($"{elementIdentifier}_response", responseValue, responseType == "json" ? "json" : "string"),
-                new($"{elementIdentifier}_headers", headersDict, "json")
-            };
+                new($"{elementIdentifier}_headers", headersDict, "json"),
 
-            if (!string.IsNullOrWhiteSpace(_options.ResultVariable))
-            {
-                var resultType = parsedJson.HasValue ? "json" : responseType;
-                var resultValue = parsedJson.HasValue ? parsedJson.Value : responseBody;
-                variableList.Add(new(_options.ResultVariable!, resultValue, resultType == "json" ? "json" : "string"));
-            }
+                new($"JsonResponsePayload", responseValue, responseType == "json" ? "json" : "string"),
+            };
 
             var completePayload = new
             {
@@ -439,8 +491,5 @@ public sealed record WorkerOptions
     public int? PollPeriodSeconds { get; init; }
     public int? MaxDegreeOfParallelism { get; init; }
     public string? TargetUrl { get; init; }
-    public string? Identifier { get; init; }
-    public string? ResultVariable { get; init; }
-    public string? InputVariable { get; init; }
 
 }
