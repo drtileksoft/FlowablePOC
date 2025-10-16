@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -105,16 +106,23 @@ public sealed class ExternalWorkerService : BackgroundService
     }
 
     // DTOs pro external-job-api
+    private static readonly JsonSerializerOptions OutgoingJsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     private record AcquireRequest(string workerId, int maxJobs, string lockDuration, string topic, bool fetchVariables = true);
     private record Variable(string name, object value, string type);
     private record AcquiredJob(
         string id, string topic, string lockExpirationTime, string createTime,
         string executionId, string processInstanceId, string processDefinitionId,
-        string? tenantId, List<Variable>? variables)
+        string? tenantId, string? elementId, List<Variable>? variables)
     {
-        public Dictionary<string, object> VariablesAsDictionary => 
+        public Dictionary<string, object> VariablesAsDictionary =>
             variables?.ToDictionary(v => v.name, v => v.value) ?? new Dictionary<string, object>();
     }
+
+    private sealed record CompleteVariable(string name, object? value, string? type = null);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -256,7 +264,7 @@ public sealed class ExternalWorkerService : BackgroundService
             };
 
             var sw = Stopwatch.StartNew();
-            using var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+            using var content = new StringContent(JsonSerializer.Serialize(payload, OutgoingJsonOptions), Encoding.UTF8, "application/json");
             _log.LogInformation("Calling SRD... url={Url}", srdUrl);
 
             using var resp = await srd.PostAsync(srdUrl, content, ct);
@@ -274,15 +282,55 @@ public sealed class ExternalWorkerService : BackgroundService
 
             var responseBody = await resp.Content.ReadAsStringAsync(ct);
 
-            var variableList = new List<object>
+            var elementIdentifier = string.IsNullOrWhiteSpace(job.elementId) ? job.topic : job.elementId!;
+            var contentType = resp.Content.Headers.ContentType?.MediaType;
+            var trimmed = responseBody.Trim();
+
+            var responseType = "string";
+            object responseValue = responseBody;
+            JsonElement? parsedJson = null;
+
+            if (!string.IsNullOrEmpty(responseBody))
             {
-                new { name = "srdStatus", value = "OK" },
-                new { name = "srdClientTs", value = clientTs }
+                if (IsJsonContentType(contentType) || LooksLikeJson(trimmed))
+                {
+                    if (TryParseJson(responseBody, out var jsonElement))
+                    {
+                        responseType = "json";
+                        responseValue = jsonElement;
+                        parsedJson = jsonElement;
+                    }
+                }
+                else if (IsXmlContentType(contentType) || LooksLikeXml(trimmed))
+                {
+                    responseType = "xml";
+                }
+            }
+
+            var headersDict = resp.Headers
+                .Select(h => (h.Key, Values: h.Value))
+                .Concat(resp.Content.Headers.Select(h => (h.Key, Values: h.Value)))
+                .GroupBy(h => h.Key, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.SelectMany(v => v.Values).ToArray(),
+                    StringComparer.OrdinalIgnoreCase);
+
+            var variableList = new List<CompleteVariable>
+            {
+                new("srdStatus", "OK", "string"),
+                new("srdClientTs", clientTs, "string"),
+                new($"{elementIdentifier}_statusCode", (int)resp.StatusCode, "integer"),
+                new($"{elementIdentifier}_response_type", responseType, "string"),
+                new($"{elementIdentifier}_response", responseValue, responseType == "json" ? "json" : "string"),
+                new($"{elementIdentifier}_headers", headersDict, "json")
             };
 
             if (!string.IsNullOrWhiteSpace(_options.ResultVariable))
             {
-                variableList.Add(new { name = _options.ResultVariable!, value = responseBody });
+                var resultType = parsedJson.HasValue ? "json" : responseType;
+                var resultValue = parsedJson.HasValue ? parsedJson.Value : responseBody;
+                variableList.Add(new(_options.ResultVariable!, resultValue, resultType == "json" ? "json" : "string"));
             }
 
             var completePayload = new
@@ -291,7 +339,7 @@ public sealed class ExternalWorkerService : BackgroundService
                 variables = variableList
             };
 
-            using var completeContent = new StringContent(JsonSerializer.Serialize(completePayload), Encoding.UTF8, "application/json");
+            using var completeContent = new StringContent(JsonSerializer.Serialize(completePayload, OutgoingJsonOptions), Encoding.UTF8, "application/json");
             var swComplete = Stopwatch.StartNew();
             using var completeResp = await flowable.PostAsync($"acquire/jobs/{job.id}/complete", completeContent, ct);
             swComplete.Stop();
@@ -339,10 +387,44 @@ public sealed class ExternalWorkerService : BackgroundService
             retryTimeout = $"PT{retryHintSeconds}S",
             errorMessage = "SRD call failed"
         };
-        using var cnt = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+        using var cnt = new StringContent(JsonSerializer.Serialize(payload, OutgoingJsonOptions), Encoding.UTF8, "application/json");
         using var resp = await flowable.PostAsync($"acquire/jobs/{jobId}/fail", cnt, ct);
         _log.LogInformation("Job failed with retry timeout {Retry}s => status={Status}", retryHintSeconds, (int)resp.StatusCode);
     }
+
+    private static bool TryParseJson(string input, out JsonElement element)
+    {
+        try
+        {
+            element = JsonSerializer.Deserialize<JsonElement>(input);
+            return true;
+        }
+        catch (JsonException)
+        {
+            element = default;
+            return false;
+        }
+    }
+
+    private static bool LooksLikeJson(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+        {
+            return false;
+        }
+
+        var firstChar = input.FirstOrDefault();
+        return firstChar is '{' or '[';
+    }
+
+    private static bool LooksLikeXml(string input)
+        => !string.IsNullOrEmpty(input) && input.StartsWith('<');
+
+    private static bool IsJsonContentType(string? contentType)
+        => !string.IsNullOrEmpty(contentType) && contentType.Contains("json", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsXmlContentType(string? contentType)
+        => !string.IsNullOrEmpty(contentType) && contentType.Contains("xml", StringComparison.OrdinalIgnoreCase);
 
     private LogLevel GetMinLogLevel()
         => (LogLevel)Enum.Parse(typeof(LogLevel), Environment.GetEnvironmentVariable("WORKER__LOGLEVEL") ?? "Information", true);
