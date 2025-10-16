@@ -51,27 +51,6 @@ services:
   flowable-http-worker:
     build: .
     image: flowable-http-worker:latest
-    environment:
-      FLOWABLE__BASEURL: "http://flowable-rest:8080/flowable-rest/external-job-api"
-      FLOWABLE__USER: "rest-admin"
-      FLOWABLE__PASS: "test"
-      FLOWABLE__TOPIC: "srd.call"
-      FLOWABLE__WORKERID: "flowable-http-worker-1"
-      FLOWABLE__LOCKDURATION: "PT30S"
-      FLOWABLE__MAXJOBSPERTICK: "10"
-      FLOWABLE__POLLPERIODSECONDS: "2"
-      FLOWABLE__MAXDEGREEOFPARALLELISM: "4"
-      SRD__URL: "https://httplogapi.azurewebsites.net/api/events"
-      SRD__IDENTIFIER: "FLOWABLE_POC_WORKER"
-      SRD__HTTPTIMEOUTSECONDS: "10"
-      WINDOWS__TIMEZONE: "Europe/Prague"
-      WINDOWS__PAUSEFROMHOUR: "14"
-      WINDOWS__PAUSETOHOUREXCLUSIVE: "15"
-      RETRY__INITIALDELAYSECONDS: "60"
-      RETRY__MAXDELAYSECONDS: "900"
-      RETRY__JITTERSECONDS: "5"
-      ALLOWINSECURESSL: "true"
-      WORKER__LOGLEVEL: "Debug"
     restart: unless-stopped
 
 volumes:

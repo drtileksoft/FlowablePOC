@@ -17,7 +17,8 @@ builder.Configuration
     .AddEnvironmentVariables();
 
 // ---- Logging ----
-var configuredLevel = builder.Configuration["WORKER__LOGLEVEL"];
+var configuredLevel = builder.Configuration["Worker:LogLevel"]
+    ?? builder.Configuration["WORKER__LOGLEVEL"];
 var minLevel = Enum.TryParse<LogLevel>(configuredLevel, true, out var lvl) ? lvl : LogLevel.Information;
 
 builder.Logging.ClearProviders();
@@ -74,7 +75,7 @@ var workerOptions = builder.Configuration
 
 if (workerOptions.Count == 0)
 {
-    workerOptions.Add(WorkerOptions.FromLegacy(builder.Configuration));
+    throw new InvalidOperationException("No workers configured. Please define Flowable:Workers in configuration.");
 }
 
 foreach (var options in workerOptions)
@@ -363,19 +364,4 @@ public sealed record WorkerOptions
     public string? ResultVariable { get; init; }
     public string? InputVariable { get; init; }
 
-    public static WorkerOptions FromLegacy(IConfiguration cfg)
-    {
-        return new WorkerOptions
-        {
-            Topic = cfg["Flowable:Topic"] ?? "srd.call",
-            WorkerId = cfg["Flowable:WorkerId"] ?? "srd-worker-1",
-            LockDuration = cfg["Flowable:LockDuration"],
-            MaxJobsPerTick = cfg.GetValue<int?>("Flowable:MaxJobsPerTick"),
-            PollPeriodSeconds = cfg.GetValue<int?>("Flowable:PollPeriodSeconds"),
-            MaxDegreeOfParallelism = cfg.GetValue<int?>("Flowable:MaxDegreeOfParallelism"),
-            TargetUrl = cfg["SRD:Url"],
-            Identifier = cfg["SRD:Identifier"],
-            ResultVariable = cfg["Flowable:ResultVariable"] ?? "srdCallResult"
-        };
-    }
 }
