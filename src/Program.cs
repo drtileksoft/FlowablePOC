@@ -17,9 +17,8 @@ builder.Configuration
     .AddEnvironmentVariables();
 
 // ---- Logging ----
-var configuredLevel = builder.Configuration["Worker:LogLevel"]
-    ?? builder.Configuration["WORKER__LOGLEVEL"];
-var minLevel = Enum.TryParse<LogLevel>(configuredLevel, true, out var lvl) ? lvl : LogLevel.Information;
+var configuredLevel = builder.Configuration["Worker:LogLevel"];
+var minLevel = Enum.TryParse<LogLevel>(configuredLevel, true, out var lvl) ? lvl : LogLevel.Debug;
 
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(o =>
@@ -132,7 +131,6 @@ public sealed class ExternalWorkerService : BackgroundService
         int mdop = _options.MaxDegreeOfParallelism ?? int.Parse(_cfg["Flowable:MaxDegreeOfParallelism"] ?? "2");
 
         var srdUrl = _options.TargetUrl ?? _cfg["SRD:Url"] ?? throw new("SRD:Url missing");
-        var identifier = _options.Identifier ?? _cfg["SRD:Identifier"] ?? "FLOWABLE_POC_WORKER";
         bool insecure = _cfg.GetValue("AllowInsecureSsl", false);
 
         var flowable = _http.CreateClient("flowable");
@@ -162,7 +160,7 @@ public sealed class ExternalWorkerService : BackgroundService
                 // Acquire
                 var req = new AcquireRequest(workerId, maxJobs, lockDuration, topic, fetchVariables: true);
                 var json = JsonSerializer.Serialize(req);
-                _log.LogInformation("Acquire request: {Json}", json);
+                _log.LogDebug("Acquire request: {Json}", json);
                 using var acqBody = new StringContent(json, Encoding.UTF8, "application/json");
 
                 var swAcquire = Stopwatch.StartNew();
@@ -194,7 +192,7 @@ public sealed class ExternalWorkerService : BackgroundService
 
                 // Zpracování s omezeným paralelismem
                 using var throttler = new SemaphoreSlim(mdop);
-                var tasks = jobs.Select(job => ProcessJob(job, throttler, flowable, srd, identifier, workerId, srdUrl, rnd, stoppingToken)).ToList();
+                var tasks = jobs.Select(job => ProcessJob(job, throttler, flowable, srd, workerId, srdUrl, rnd, stoppingToken)).ToList();
                 await Task.WhenAll(tasks);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -217,7 +215,6 @@ public sealed class ExternalWorkerService : BackgroundService
         SemaphoreSlim throttler,
         HttpClient flowable,
         HttpClient srd,
-        string identifier,
         string workerId,
         string srdUrl,
         Random rnd,
@@ -244,7 +241,7 @@ public sealed class ExternalWorkerService : BackgroundService
 
             var payload = new
             {
-                id = identifier,
+                id = workerId,
                 clientTs,
                 data = new
                 {
