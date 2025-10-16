@@ -20,4 +20,7 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="FlowableExternalWorker/FlowableExternalWorker.csproj" />
+  </ItemGroup>
 </Project>
