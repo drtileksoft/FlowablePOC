@@ -10,13 +10,29 @@
             </timerEventDefinition>
         </startEvent>
         <serviceTask id="externalTask" name="External SRD Task"
-                     flowable:type="external"
+                     flowable:type="external-worker"
                      flowable:topic="srd.call"
-                     flowable:async="true" />
+                     flowable:async="true">
+                <extensionElements>
+                    <flowable:externalWorkerInParameter target="JsonPayload">
+                        <flowable:sourceExpression><![CDATA['{"data":{"hello":"flow"}}']]></flowable:sourceExpression>
+                    </flowable:externalWorkerInParameter>
+                    <!-- Worker musí na COMPLETE vrátit job-proměnnou JsonResponsePayload (ideálně type=json).
+                        Tady ji mapujeme do procesní proměnné SrdCall1result -->
+                    <flowable:externalWorkerOutParameter source="JsonResponsePayload" target="SrdCall1result"></flowable:externalWorkerOutParameter>
+                </extensionElements>
+        </serviceTask>
         <serviceTask id="externalTask2" name="External SRD Task 2"
-                     flowable:type="external"
+                     flowable:type="external-worker"
                      flowable:topic="srd2.call"
-                     flowable:async="true" />
+                     flowable:async="true">
+                <extensionElements>
+                    <!-- pošli celý výsledek prvního volání jako vstup -->
+                    <flowable:externalWorkerInParameter source="SrdCall1result" target="JsonPayload"></flowable:externalWorkerInParameter>
+                    <!-- Výsledek druhého workeru mapuj do procesní SrdCall2result -->
+                    <flowable:externalWorkerOutParameter source="JsonResponsePayload" target="SrdCall2result"></flowable:externalWorkerOutParameter>
+                </extensionElements>
+        </serviceTask>
         <endEvent id="endEvent" />
         <sequenceFlow sourceRef="startEvent" targetRef="externalTask" />
         <sequenceFlow sourceRef="externalTask" targetRef="externalTask2" />
