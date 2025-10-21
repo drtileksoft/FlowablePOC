@@ -96,13 +96,7 @@ public static class ServiceCollectionExtensions
         flowableOptions.FlowableHttpClientName = string.IsNullOrWhiteSpace(flowableOptions.FlowableHttpClientName)
             ? FlowableWorkerOptions.DefaultFlowableHttpClientName
             : flowableOptions.FlowableHttpClientName;
-        flowableOptions.Retry = new RetryOptions
-        {
-            InitialDelaySeconds = retry.InitialDelaySeconds,
-            MaxDelaySeconds = retry.MaxDelaySeconds,
-            JitterSeconds = retry.JitterSeconds,
-            BackoffMultiplier = retry.BackoffMultiplier
-        };
+        flowableOptions.Retry = ResolveRetryOptions(flowableOptionsSection, retry);
 
         var httpOptionsSection = workerSection.GetSection(HttpOptionsSectionName);
         if (!httpOptionsSection.Exists())
@@ -117,23 +111,39 @@ public static class ServiceCollectionExtensions
             throw new InvalidOperationException("Endpoint URL must be configured.");
         }
 
-        var httpClientName = string.IsNullOrWhiteSpace(httpOptions.HttpClientName)
+        httpOptions.HttpClientName = string.IsNullOrWhiteSpace(httpOptions.HttpClientName)
             ? $"srd-{flowableOptions.WorkerId}"
             : httpOptions.HttpClientName;
         var timeout = Math.Max(1, httpOptions.TimeoutSeconds);
 
-        services.AddHttpClient(httpClientName, client =>
+        services.AddHttpClient(httpOptions.HttpClientName, client =>
         {
             client.Timeout = TimeSpan.FromSeconds(timeout);
         });
 
-        var runtimeOptions = new HttpWorkerRuntimeOptions(
-            flowableOptions.WorkerId,
-            httpOptions.TargetUrl,
-            httpClientName);
-
         services.AddFlowableExternalWorker<THandler>(
             flowableOptions,
-            sp => ActivatorUtilities.CreateInstance<THandler>(sp, runtimeOptions));
+            sp => ActivatorUtilities.CreateInstance<THandler>(
+                sp,
+                flowableOptions.WorkerId,
+                httpOptions));
+    }
+
+    private static RetryOptions ResolveRetryOptions(
+        IConfigurationSection flowableOptionsSection,
+        RetryOptions fallback)
+    {
+        var workerRetrySection = flowableOptionsSection.GetSection(nameof(FlowableWorkerOptions.Retry));
+        var workerRetry = workerRetrySection.Exists()
+            ? workerRetrySection.Get<RetryOptions>() ?? new RetryOptions()
+            : fallback;
+
+        return new RetryOptions
+        {
+            InitialDelaySeconds = workerRetry.InitialDelaySeconds,
+            MaxDelaySeconds = workerRetry.MaxDelaySeconds,
+            JitterSeconds = workerRetry.JitterSeconds,
+            BackoffMultiplier = workerRetry.BackoffMultiplier
+        };
     }
 }
