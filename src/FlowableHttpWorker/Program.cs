@@ -104,8 +104,6 @@ foreach (var options in workerOptions)
 
 await builder.Build().RunAsync();
 
-namespace FlowableHttpWorker;
-
 public sealed record WorkerOptions
 {
     public string? Topic { get; init; }

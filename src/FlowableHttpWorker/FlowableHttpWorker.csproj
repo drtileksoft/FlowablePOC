@@ -21,6 +21,6 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="FlowableExternalWorker/FlowableExternalWorker.csproj" />
+    <ProjectReference Include="../FlowableExternalWorker/FlowableExternalWorker.csproj" />
   </ItemGroup>
 </Project>
