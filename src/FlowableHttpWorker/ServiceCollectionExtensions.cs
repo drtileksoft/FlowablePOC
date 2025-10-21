@@ -15,7 +15,7 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        services.AddFlowableClient(configuration, out var clientOptions);
+        services.AddFlowableClient(configuration);
 
         var retrySection = configuration.GetSection("Flowable").GetSection("Retry");
         var retry = retrySection.Get<RetryOptions>() ?? new RetryOptions();
@@ -34,7 +34,7 @@ public static class ServiceCollectionExtensions
 
         foreach (var workerSection in workerSections)
         {
-            RegisterHttpWorker(services, workerSection.Key, workerSection.Get<HttpWorkerConfiguration>(), clientOptions, retry);
+            RegisterHttpWorker(services, workerSection.Key, workerSection.Get<HttpWorkerConfiguration>(), retry);
         }
 
         return services;
@@ -44,7 +44,6 @@ public static class ServiceCollectionExtensions
         IServiceCollection services,
         string? handlerName,
         HttpWorkerConfiguration? definition,
-        FlowableClientOptions clientOptions,
         RetryOptions retry)
     {
         if (string.IsNullOrWhiteSpace(handlerName))
@@ -57,10 +56,10 @@ public static class ServiceCollectionExtensions
         switch (handlerName)
         {
             case nameof(HttpExternalTaskHandler):
-                RegisterHttpWorker<HttpExternalTaskHandler>(services, definition, clientOptions, retry);
+                RegisterHttpWorker<HttpExternalTaskHandler>(services, definition, retry);
                 break;
             case nameof(HttpExternalTaskHandler2):
-                RegisterHttpWorker<HttpExternalTaskHandler2>(services, definition, clientOptions, retry);
+                RegisterHttpWorker<HttpExternalTaskHandler2>(services, definition, retry);
                 break;
             default:
                 throw new InvalidOperationException($"Unknown worker handler configured: {handlerName}.");
@@ -70,7 +69,6 @@ public static class ServiceCollectionExtensions
     private static void RegisterHttpWorker<THandler>(
         IServiceCollection services,
         HttpWorkerConfiguration definition,
-        FlowableClientOptions clientOptions,
         RetryOptions retry)
         where THandler : class, IFlowableJobHandler
     {
@@ -87,9 +85,7 @@ public static class ServiceCollectionExtensions
             PollPeriodSeconds = queue.PollPeriodSeconds ?? 3,
             MaxDegreeOfParallelism = queue.MaxDegreeOfParallelism ?? 2,
             InitialRetries = queue.InitialRetries ?? 3,
-            FlowableHttpClientName = string.IsNullOrWhiteSpace(clientOptions.HttpClientName)
-                ? FlowableWorkerOptions.DefaultFlowableHttpClientName
-                : clientOptions.HttpClientName,
+            FlowableHttpClientName = FlowableWorkerOptions.DefaultFlowableHttpClientName,
             TimeWindow = definition.Window ?? new FlowableWorkerTimeWindowOptions(),
             Retry = new RetryOptions
             {

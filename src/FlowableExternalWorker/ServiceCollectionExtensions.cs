@@ -60,7 +60,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(options);
 
         services
-            .AddHttpClient(options.HttpClientName, client =>
+            .AddHttpClient(FlowableWorkerOptions.DefaultFlowableHttpClientName, client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(Math.Max(1, options.HttpTimeoutSeconds));
             })
