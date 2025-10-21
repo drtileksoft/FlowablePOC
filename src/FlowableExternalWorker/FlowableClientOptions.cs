@@ -12,6 +12,4 @@ public sealed class FlowableClientOptions
         = false;
 
     public int HttpTimeoutSeconds { get; set; } = 30;
-
-    public string HttpClientName { get; set; } = FlowableWorkerOptions.DefaultFlowableHttpClientName;
 }
