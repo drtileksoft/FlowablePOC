@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -50,7 +51,7 @@ public static class ServiceCollectionExtensions
             throw new ArgumentException("Pass must be provided", nameof(options));
         }
 
-        services.AddSingleton(options);
+        services.TryAddSingleton(options);
 
         services
             .AddHttpClient(FlowableWorkerOptions.DefaultFlowableHttpClientName, client =>

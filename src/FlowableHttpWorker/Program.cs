@@ -25,6 +25,8 @@ builder.Services.Configure<HostOptions>(options =>
     options.ServicesStopConcurrently = true;
 });
 
-builder.Services.AddFlowableHttpWorkers(builder.Configuration);
+builder.Services
+    .AddHttpExternalTaskHandlerWorker(builder.Configuration)
+    .AddHttpExternalTaskHandler2Worker(builder.Configuration);
 
 await builder.Build().RunAsync();

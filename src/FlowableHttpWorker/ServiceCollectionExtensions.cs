@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Flowable.ExternalWorker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -8,60 +7,40 @@ namespace FlowableHttpWorker;
 
 public static class ServiceCollectionExtensions
 {
-    private const string WorkersSectionName = "FlowableWorkers";
     private const string FlowableOptionsSectionName = "Flowable";
     private const string HttpOptionsSectionName = "Http";
 
-    public static IServiceCollection AddFlowableHttpWorkers(
+    public static IServiceCollection AddHttpExternalTaskHandlerWorker(
         this IServiceCollection services,
         IConfiguration configuration)
+        => AddHttpWorker<HttpExternalTaskHandler>(services, configuration, nameof(HttpExternalTaskHandler));
+
+    public static IServiceCollection AddHttpExternalTaskHandler2Worker(
+        this IServiceCollection services,
+        IConfiguration configuration)
+        => AddHttpWorker<HttpExternalTaskHandler2>(services, configuration, nameof(HttpExternalTaskHandler2));
+
+    private static IServiceCollection AddHttpWorker<THandler>(
+        IServiceCollection services,
+        IConfiguration configuration,
+        string configurationSectionName)
+        where THandler : class, IFlowableJobHandler
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
         services.AddFlowableClient(configuration);
 
-        var workersSection = configuration.GetSection(WorkersSectionName);
-        if (!workersSection.Exists())
+        var workerSection = configuration.GetSection(configurationSectionName);
+        if (!workerSection.Exists())
         {
-            throw new InvalidOperationException("FlowableWorkers section is required in configuration.");
+            throw new InvalidOperationException(
+                $"Configuration section '{configurationSectionName}' is required.");
         }
 
-        var workerSections = workersSection.GetChildren().ToList();
-        if (workerSections.Count == 0)
-        {
-            throw new InvalidOperationException("No workers configured. Please define FlowableWorkers in configuration.");
-        }
-
-        foreach (var workerSection in workerSections)
-        {
-            RegisterHttpWorker(services, workerSection.Key, workerSection);
-        }
+        RegisterHttpWorker<THandler>(services, workerSection);
 
         return services;
-    }
-
-    private static void RegisterHttpWorker(
-        IServiceCollection services,
-        string? handlerName,
-        IConfigurationSection workerSection)
-    {
-        if (string.IsNullOrWhiteSpace(handlerName))
-        {
-            throw new InvalidOperationException("Worker handler name must be provided in configuration.");
-        }
-
-        switch (handlerName)
-        {
-            case nameof(HttpExternalTaskHandler):
-                RegisterHttpWorker<HttpExternalTaskHandler>(services, workerSection);
-                break;
-            case nameof(HttpExternalTaskHandler2):
-                RegisterHttpWorker<HttpExternalTaskHandler2>(services, workerSection);
-                break;
-            default:
-                throw new InvalidOperationException($"Unknown worker handler configured: {handlerName}.");
-        }
     }
 
     private static void RegisterHttpWorker<THandler>(
