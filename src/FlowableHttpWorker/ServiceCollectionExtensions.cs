@@ -8,7 +8,6 @@ namespace FlowableHttpWorker;
 
 public static class ServiceCollectionExtensions
 {
-    private const string FlowableSectionName = "FlowableRest";
     private const string WorkersSectionName = "FlowableWorkers";
     private const string FlowableOptionsSectionName = "Flowable";
     private const string HttpOptionsSectionName = "Http";
@@ -21,9 +20,6 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
 
         services.AddFlowableClient(configuration);
-
-        var retrySection = configuration.GetSection(FlowableSectionName).GetSection("Retry");
-        var retry = retrySection.Get<RetryOptions>() ?? new RetryOptions();
 
         var workersSection = configuration.GetSection(WorkersSectionName);
         if (!workersSection.Exists())
@@ -39,7 +35,7 @@ public static class ServiceCollectionExtensions
 
         foreach (var workerSection in workerSections)
         {
-            RegisterHttpWorker(services, workerSection.Key, workerSection, retry);
+            RegisterHttpWorker(services, workerSection.Key, workerSection);
         }
 
         return services;
@@ -48,8 +44,7 @@ public static class ServiceCollectionExtensions
     private static void RegisterHttpWorker(
         IServiceCollection services,
         string? handlerName,
-        IConfigurationSection workerSection,
-        RetryOptions retry)
+        IConfigurationSection workerSection)
     {
         if (string.IsNullOrWhiteSpace(handlerName))
         {
@@ -59,10 +54,10 @@ public static class ServiceCollectionExtensions
         switch (handlerName)
         {
             case nameof(HttpExternalTaskHandler):
-                RegisterHttpWorker<HttpExternalTaskHandler>(services, workerSection, retry);
+                RegisterHttpWorker<HttpExternalTaskHandler>(services, workerSection);
                 break;
             case nameof(HttpExternalTaskHandler2):
-                RegisterHttpWorker<HttpExternalTaskHandler2>(services, workerSection, retry);
+                RegisterHttpWorker<HttpExternalTaskHandler2>(services, workerSection);
                 break;
             default:
                 throw new InvalidOperationException($"Unknown worker handler configured: {handlerName}.");
@@ -71,8 +66,7 @@ public static class ServiceCollectionExtensions
 
     private static void RegisterHttpWorker<THandler>(
         IServiceCollection services,
-        IConfigurationSection workerSection,
-        RetryOptions retry)
+        IConfigurationSection workerSection)
         where THandler : class, IFlowableJobHandler
     {
         var flowableOptionsSection = workerSection.GetSection(FlowableOptionsSectionName);
@@ -96,7 +90,7 @@ public static class ServiceCollectionExtensions
         flowableOptions.FlowableHttpClientName = string.IsNullOrWhiteSpace(flowableOptions.FlowableHttpClientName)
             ? FlowableWorkerOptions.DefaultFlowableHttpClientName
             : flowableOptions.FlowableHttpClientName;
-        flowableOptions.Retry = ResolveRetryOptions(flowableOptionsSection, retry);
+        flowableOptions.Retry = ResolveRetryOptions(flowableOptionsSection);
 
         var httpOptionsSection = workerSection.GetSection(HttpOptionsSectionName);
         if (!httpOptionsSection.Exists())
@@ -130,13 +124,12 @@ public static class ServiceCollectionExtensions
     }
 
     private static RetryOptions ResolveRetryOptions(
-        IConfigurationSection flowableOptionsSection,
-        RetryOptions fallback)
+        IConfigurationSection flowableOptionsSection)
     {
         var workerRetrySection = flowableOptionsSection.GetSection(nameof(FlowableWorkerOptions.Retry));
         var workerRetry = workerRetrySection.Exists()
             ? workerRetrySection.Get<RetryOptions>() ?? new RetryOptions()
-            : fallback;
+            : new RetryOptions();
 
         return new RetryOptions
         {
