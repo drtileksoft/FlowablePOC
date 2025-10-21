@@ -77,6 +77,10 @@ public static class ServiceCollectionExtensions
             services.AddFlowableExternalWorker<HttpExternalTaskHandler>(
                 flowableOptions,
                 sp => ActivatorUtilities.CreateInstance<HttpExternalTaskHandler>(sp, runtimeOptions));
+
+            services.AddFlowableExternalWorker<HttpExternalTaskHandler2>(
+                flowableOptions,
+                sp => ActivatorUtilities.CreateInstance<HttpExternalTaskHandler2>(sp, runtimeOptions));
         }
 
         return services;

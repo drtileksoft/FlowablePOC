@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Net.Http;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FlowableHttpWorker;
 
-public sealed class HttpExternalTaskHandler : IFlowableJobHandler
+public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -18,13 +18,13 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
     };
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILogger<HttpExternalTaskHandler> _logger;
+    private readonly ILogger<HttpExternalTaskHandler2> _logger;
     private readonly HttpWorkerRuntimeOptions _options;
 
-    public HttpExternalTaskHandler(
+    public HttpExternalTaskHandler2(
         HttpWorkerRuntimeOptions options,
         IHttpClientFactory httpClientFactory,
-        ILogger<HttpExternalTaskHandler> logger)
+        ILogger<HttpExternalTaskHandler2> logger)
     {
         _options = options;
         _httpClientFactory = httpClientFactory;
@@ -48,9 +48,9 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
                 pi = context.Job.ProcessInstanceId,
                 exec = context.Job.ExecutionId,
                 variables = context.Variables,
-                //forwardedResult = context.Variables.TryGetValue("JsonPayload", out var forwarded)
-                //    ? forwarded
-                //    : null
+                forwardedResult = context.Variables.TryGetValue("JsonPayload", out var forwarded)
+                    ? forwarded
+                    : null
             }
         };
 
