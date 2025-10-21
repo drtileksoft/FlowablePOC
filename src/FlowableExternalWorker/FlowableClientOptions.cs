@@ -2,6 +2,8 @@ namespace Flowable.ExternalWorker;
 
 public sealed class FlowableClientOptions
 {
+    public const string DefaultFlowableHttpClientName = "flowableRestHttpClient";
+
     public string BaseUrl { get; set; } = string.Empty;
 
     public string User { get; set; } = string.Empty;

@@ -10,6 +10,8 @@ namespace Flowable.ExternalWorker;
 public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
     where THandler : IFlowableJobHandler
 {
+    
+
     private static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web)
     {
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -44,7 +46,7 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var flowableClient = _httpClientFactory.CreateClient();
+        var flowableClient = _httpClientFactory.CreateClient(FlowableClientOptions.DefaultFlowableHttpClientName);
         var topic = _options.Topic;
         var workerId = _options.WorkerId;
         var lockDuration = _options.LockDuration;
