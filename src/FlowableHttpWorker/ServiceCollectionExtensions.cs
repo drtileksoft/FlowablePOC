@@ -1,4 +1,5 @@
-using System.Collections.Generic;
+using System;
+using System.Linq;
 using Flowable.ExternalWorker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,75 +15,108 @@ public static class ServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var flowableSection = configuration.GetSection("Flowable");
-        if (!flowableSection.Exists())
-        {
-            throw new InvalidOperationException("Flowable section is required in configuration.");
-        }
+        services.AddFlowableClient(configuration, out var clientOptions);
 
-        var clientSection = flowableSection.GetSection("Client");
-        var clientOptions = clientSection.Get<FlowableClientOptions>()
-            ?? throw new InvalidOperationException("Flowable:Client section is required in configuration.");
-        services.AddFlowableClient(clientOptions);
-
-        var retrySection = flowableSection.GetSection("Retry");
+        var retrySection = configuration.GetSection("Flowable").GetSection("Retry");
         var retry = retrySection.Get<RetryOptions>() ?? new RetryOptions();
 
-        var workersSection = flowableSection.GetSection("Workers");
-        var workerDefinitions = workersSection.Get<List<HttpWorkerConfiguration>>() ?? new List<HttpWorkerConfiguration>();
-        if (workerDefinitions.Count == 0)
+        var workersSection = configuration.GetSection("FlowableWorkers");
+        if (!workersSection.Exists())
         {
-            throw new InvalidOperationException("No workers configured. Please define Flowable:Workers in configuration.");
+            throw new InvalidOperationException("FlowableWorkers section is required in configuration.");
         }
 
-        foreach (var definition in workerDefinitions)
+        var workerSections = workersSection.GetChildren().ToList();
+        if (workerSections.Count == 0)
         {
-            var topic = definition.Topic ?? throw new InvalidOperationException("Worker topic must be configured.");
-            var workerId = definition.WorkerId ?? throw new InvalidOperationException("WorkerId must be configured.");
+            throw new InvalidOperationException("No workers configured. Please define FlowableWorkers in configuration.");
+        }
 
-            var queue = definition.Queue ?? new HttpQueueOptions();
-            var flowableOptions = new FlowableWorkerOptions
-            {
-                Topic = topic,
-                WorkerId = workerId,
-                LockDuration = queue.LockDuration ?? "PT30S",
-                MaxJobsPerTick = queue.MaxJobsPerTick ?? 5,
-                PollPeriodSeconds = queue.PollPeriodSeconds ?? 3,
-                MaxDegreeOfParallelism = queue.MaxDegreeOfParallelism ?? 2,
-                InitialRetries = queue.InitialRetries ?? 3,
-                FlowableHttpClientName = clientOptions.HttpClientName,
-                TimeWindow = definition.Window ?? new FlowableWorkerTimeWindowOptions(),
-                Retry = new RetryOptions
-                {
-                    InitialDelaySeconds = retry.InitialDelaySeconds,
-                    MaxDelaySeconds = retry.MaxDelaySeconds,
-                    JitterSeconds = retry.JitterSeconds,
-                    BackoffMultiplier = retry.BackoffMultiplier
-                }
-            };
-
-            var endpoint = definition.Endpoint ?? throw new InvalidOperationException("Worker endpoint must be configured.");
-            var httpClientName = endpoint.HttpClientName ?? $"srd-{workerId}";
-            var timeout = Math.Max(1, endpoint.TimeoutSeconds ?? 10);
-            services.AddHttpClient(httpClientName, client =>
-            {
-                client.Timeout = TimeSpan.FromSeconds(timeout);
-            });
-
-            var runtimeOptions = new HttpWorkerRuntimeOptions(
-                workerId,
-                endpoint.Url ?? throw new InvalidOperationException("Endpoint URL must be configured."),
-                httpClientName);
-
-            services.AddFlowableExternalWorker<HttpExternalTaskHandler>(
-                flowableOptions,
-                sp => ActivatorUtilities.CreateInstance<HttpExternalTaskHandler>(sp, runtimeOptions));
-
-            services.AddFlowableExternalWorker<HttpExternalTaskHandler2>(
-                flowableOptions,
-                sp => ActivatorUtilities.CreateInstance<HttpExternalTaskHandler2>(sp, runtimeOptions));
+        foreach (var workerSection in workerSections)
+        {
+            RegisterHttpWorker(services, workerSection.Key, workerSection.Get<HttpWorkerConfiguration>(), clientOptions, retry);
         }
 
         return services;
+    }
+
+    private static void RegisterHttpWorker(
+        IServiceCollection services,
+        string? handlerName,
+        HttpWorkerConfiguration? definition,
+        FlowableClientOptions clientOptions,
+        RetryOptions retry)
+    {
+        if (string.IsNullOrWhiteSpace(handlerName))
+        {
+            throw new InvalidOperationException("Worker handler name must be provided in configuration.");
+        }
+
+        definition ??= new HttpWorkerConfiguration();
+
+        switch (handlerName)
+        {
+            case nameof(HttpExternalTaskHandler):
+                RegisterHttpWorker<HttpExternalTaskHandler>(services, definition, clientOptions, retry);
+                break;
+            case nameof(HttpExternalTaskHandler2):
+                RegisterHttpWorker<HttpExternalTaskHandler2>(services, definition, clientOptions, retry);
+                break;
+            default:
+                throw new InvalidOperationException($"Unknown worker handler configured: {handlerName}.");
+        }
+    }
+
+    private static void RegisterHttpWorker<THandler>(
+        IServiceCollection services,
+        HttpWorkerConfiguration definition,
+        FlowableClientOptions clientOptions,
+        RetryOptions retry)
+        where THandler : class, IFlowableJobHandler
+    {
+        var topic = definition.Topic ?? throw new InvalidOperationException("Worker topic must be configured.");
+        var workerId = definition.WorkerId ?? throw new InvalidOperationException("WorkerId must be configured.");
+
+        var queue = definition.Queue ?? new HttpQueueOptions();
+        var flowableOptions = new FlowableWorkerOptions
+        {
+            Topic = topic,
+            WorkerId = workerId,
+            LockDuration = queue.LockDuration ?? "PT30S",
+            MaxJobsPerTick = queue.MaxJobsPerTick ?? 5,
+            PollPeriodSeconds = queue.PollPeriodSeconds ?? 3,
+            MaxDegreeOfParallelism = queue.MaxDegreeOfParallelism ?? 2,
+            InitialRetries = queue.InitialRetries ?? 3,
+            FlowableHttpClientName = string.IsNullOrWhiteSpace(clientOptions.HttpClientName)
+                ? FlowableWorkerOptions.DefaultFlowableHttpClientName
+                : clientOptions.HttpClientName,
+            TimeWindow = definition.Window ?? new FlowableWorkerTimeWindowOptions(),
+            Retry = new RetryOptions
+            {
+                InitialDelaySeconds = retry.InitialDelaySeconds,
+                MaxDelaySeconds = retry.MaxDelaySeconds,
+                JitterSeconds = retry.JitterSeconds,
+                BackoffMultiplier = retry.BackoffMultiplier
+            }
+        };
+
+        var endpoint = definition.Endpoint ?? throw new InvalidOperationException("Worker endpoint must be configured.");
+        var httpClientName = string.IsNullOrWhiteSpace(endpoint.HttpClientName)
+            ? $"srd-{workerId}"
+            : endpoint.HttpClientName;
+        var timeout = Math.Max(1, endpoint.TimeoutSeconds ?? 10);
+        services.AddHttpClient(httpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(timeout);
+        });
+
+        var runtimeOptions = new HttpWorkerRuntimeOptions(
+            workerId,
+            endpoint.Url ?? throw new InvalidOperationException("Endpoint URL must be configured."),
+            httpClientName);
+
+        services.AddFlowableExternalWorker<THandler>(
+            flowableOptions,
+            sp => ActivatorUtilities.CreateInstance<THandler>(sp, runtimeOptions));
     }
 }

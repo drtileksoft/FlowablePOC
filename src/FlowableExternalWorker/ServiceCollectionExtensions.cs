@@ -1,6 +1,7 @@
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -10,6 +11,31 @@ namespace Flowable.ExternalWorker;
 public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddFlowableClient(
+        this IServiceCollection services,
+        IConfiguration configuration)
+        => services.AddFlowableClient(configuration, out _);
+
+    public static IServiceCollection AddFlowableClient(
+        this IServiceCollection services,
+        IConfiguration configuration,
+        out FlowableClientOptions clientOptions)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var flowableSection = configuration.GetSection("Flowable");
+        if (!flowableSection.Exists())
+        {
+            throw new InvalidOperationException("Flowable section is required in configuration.");
+        }
+
+        var clientSection = flowableSection.GetSection("Client");
+        clientOptions = clientSection.Get<FlowableClientOptions>()
+            ?? throw new InvalidOperationException("Flowable:Client section is required in configuration.");
+
+        return services.AddFlowableClientCore(clientOptions);
+    }
+
+    private static IServiceCollection AddFlowableClientCore(
         this IServiceCollection services,
         FlowableClientOptions options)
     {
