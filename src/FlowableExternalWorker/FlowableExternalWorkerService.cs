@@ -44,7 +44,7 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var flowableClient = _httpClientFactory.CreateClient(_options.FlowableHttpClientName);
+        var flowableClient = _httpClientFactory.CreateClient();
         var topic = _options.Topic;
         var workerId = _options.WorkerId;
         var lockDuration = _options.LockDuration;

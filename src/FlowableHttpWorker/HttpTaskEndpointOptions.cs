@@ -6,6 +6,4 @@ public sealed class HttpTaskEndpointOptions
 
     public int TimeoutSeconds { get; set; } = 10;
 
-    public string? HttpClientName { get; set; }
-        = null;
 }

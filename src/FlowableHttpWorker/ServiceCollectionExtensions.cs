@@ -66,9 +66,6 @@ public static class ServiceCollectionExtensions
             throw new InvalidOperationException("WorkerId must be configured.");
         }
 
-        flowableOptions.FlowableHttpClientName = string.IsNullOrWhiteSpace(flowableOptions.FlowableHttpClientName)
-            ? FlowableWorkerOptions.DefaultFlowableHttpClientName
-            : flowableOptions.FlowableHttpClientName;
         flowableOptions.Retry = ResolveRetryOptions(flowableOptionsSection);
 
         var httpOptionsSection = workerSection.GetSection(HttpOptionsSectionName);
@@ -84,12 +81,9 @@ public static class ServiceCollectionExtensions
             throw new InvalidOperationException("Endpoint URL must be configured.");
         }
 
-        httpOptions.HttpClientName = string.IsNullOrWhiteSpace(httpOptions.HttpClientName)
-            ? $"srd-{flowableOptions.WorkerId}"
-            : httpOptions.HttpClientName;
         var timeout = Math.Max(1, httpOptions.TimeoutSeconds);
 
-        services.AddHttpClient(httpOptions.HttpClientName, client =>
+        services.AddHttpClient($"httpWorker-{flowableOptions.WorkerId}", client =>
         {
             client.Timeout = TimeSpan.FromSeconds(timeout);
         });

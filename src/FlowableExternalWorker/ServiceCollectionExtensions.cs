@@ -10,6 +10,8 @@ namespace Flowable.ExternalWorker;
 
 public static class ServiceCollectionExtensions
 {
+    public const string DefaultFlowableHttpClientName = "flowableRestHttpClient";
+
     public static IServiceCollection AddFlowableClient(
         this IServiceCollection services,
         IConfiguration configuration)
@@ -54,7 +56,7 @@ public static class ServiceCollectionExtensions
         services.TryAddSingleton(options);
 
         services
-            .AddHttpClient(FlowableWorkerOptions.DefaultFlowableHttpClientName, client =>
+            .AddHttpClient(DefaultFlowableHttpClientName, client =>
             {
                 client.Timeout = TimeSpan.FromSeconds(Math.Max(1, options.HttpTimeoutSeconds));
             })

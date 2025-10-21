@@ -12,7 +12,6 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
     private readonly ILogger<HttpExternalTaskHandler> _logger;
     private readonly string _workerId;
     private readonly string _targetUrl;
-    private readonly string _httpClientName;
 
     public HttpExternalTaskHandler(
         string workerId,
@@ -27,16 +26,13 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
         _targetUrl = string.IsNullOrWhiteSpace(httpOptions.TargetUrl)
             ? throw new ArgumentException("TargetUrl must be provided", nameof(httpOptions))
             : httpOptions.TargetUrl;
-        _httpClientName = string.IsNullOrWhiteSpace(httpOptions.HttpClientName)
-            ? throw new ArgumentException("HttpClientName must be provided", nameof(httpOptions))
-            : httpOptions.HttpClientName;
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<FlowableJobHandlerResult> HandleAsync(FlowableJobContext context, CancellationToken cancellationToken) {
 
-        var httpClient = _httpClientFactory.CreateClient(_httpClientName);
+        var httpClient = _httpClientFactory.CreateClient();
 
         var input = context.Variables.TryGetValue("JsonPayload", out var forwarded) ? forwarded : null;
 

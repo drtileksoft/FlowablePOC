@@ -2,8 +2,6 @@ namespace Flowable.ExternalWorker;
 
 public sealed class FlowableWorkerOptions
 {
-    public const string DefaultFlowableHttpClientName = "flowable";
-
     public string Topic { get; set; } = string.Empty;
 
     public string WorkerId { get; set; } = string.Empty;
@@ -17,8 +15,6 @@ public sealed class FlowableWorkerOptions
     public int MaxDegreeOfParallelism { get; set; } = 2;
 
     public int InitialRetries { get; set; } = 3;
-
-    public string FlowableHttpClientName { get; set; } = DefaultFlowableHttpClientName;
 
     public FlowableWorkerTimeWindowOptions TimeWindow { get; set; } = new();
 
