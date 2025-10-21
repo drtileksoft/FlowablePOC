@@ -24,6 +24,8 @@ ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \
 COPY --from=build /app/publish/FlowableHttpWorker ./FlowableHttpWorker/
 COPY --from=build /app/publish/HttpLogApi ./HttpLogApi/
 COPY docker-entrypoint.sh ./
+RUN sed -i 's/\r$//' docker-entrypoint.sh \
+    && chmod +x docker-entrypoint.sh
 
 # Expose the local HttpLogApi for debugging if needed.
 EXPOSE 5005
