@@ -37,7 +37,24 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
 
         context.Variables.TryGetValue("JsonPayload", out var inputPayload);
 
-        var payload = HttpExternalTaskHandlerHelper.CreatePayload(context, _workerId, inputPayload);
+        _logger.LogInformation($"Processing job {context.Job.Id} worker={_workerId} with payload={inputPayload}");
+
+        _logger.LogInformation($"Job variables: {JsonSerializer.Serialize(context.Variables, HttpExternalTaskHandlerHelper.JsonOptions)}");
+
+        var payload = new HttpExternalTaskPayload(
+            _workerId,
+            DateTimeOffset.UtcNow.ToString("o"),
+            new
+            {
+                context.Job.Id,
+                context.Job.ProcessInstanceId,
+                context.Job.ExecutionId,
+                //context.Variables,
+                inputPayload
+            }
+            );
+
+        _logger.LogDebug("Payload: {Payload}", JsonSerializer.Serialize(payload, HttpExternalTaskHandlerHelper.JsonOptions));
 
         using var content = new StringContent(
             JsonSerializer.Serialize(payload, HttpExternalTaskHandlerHelper.JsonOptions),
@@ -91,10 +108,13 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
             new("JsonResponsePayload", responseValue, responseType == "json" ? "json" : "string"),
         };
 
+        _logger.LogInformation("JsonResponsePayload: {JsonResponsePayload}", JsonSerializer.Serialize(responseValue, HttpExternalTaskHandlerHelper.JsonOptions));
+
         _logger.LogInformation(
-            "External call succeeded status={Status} elapsedMs={Elapsed}",
+            "External call succeeded status={Status} elapsedMs={Elapsed} worker={WorkerId}",
             (int)response.StatusCode,
-            stopwatch.ElapsedMilliseconds);
+            stopwatch.ElapsedMilliseconds,
+            _workerId);
 
         return new FlowableJobHandlerResult(variables);
     }

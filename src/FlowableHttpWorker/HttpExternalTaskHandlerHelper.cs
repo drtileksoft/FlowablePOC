@@ -11,19 +11,6 @@ internal static class HttpExternalTaskHandlerHelper
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static HttpExternalTaskPayload CreatePayload(
-        FlowableJobContext context,
-        string workerId,
-        object? payload)
-        => new(
-            workerId,
-            DateTimeOffset.UtcNow.ToString("o"),
-            context.Job.Id,
-            context.Job.ProcessInstanceId,
-            context.Job.ExecutionId,
-            context.Variables,
-            payload);
-
     public static bool IsJson(string? contentType, string trimmed)
         => (!string.IsNullOrEmpty(contentType) && contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
             || trimmed.StartsWith('{')
@@ -63,8 +50,5 @@ internal static class HttpExternalTaskHandlerHelper
 internal sealed record HttpExternalTaskPayload(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("clientTs")] string ClientTs,
-    [property: JsonPropertyName("jobId")] string JobId,
-    [property: JsonPropertyName("pi")] string ProcessInstanceId,
-    [property: JsonPropertyName("exec")] string ExecutionId,
-    [property: JsonPropertyName("variables")] IReadOnlyDictionary<string, object?> Variables,
-    [property: JsonPropertyName("payload")] object? payload);
+    [property: JsonPropertyName("data")] object? data);
+

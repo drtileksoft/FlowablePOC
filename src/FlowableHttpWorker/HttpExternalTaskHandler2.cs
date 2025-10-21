@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Flowable.ExternalWorker;
 using Microsoft.Extensions.Logging;
 
@@ -30,6 +31,68 @@ public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// Z jakéhokoliv vstupu (string / JsonElement / JsonNode / cokoliv s JSON v ToString)
+    /// udělej JsonNode. Umí „oloupat“ vícenásobně serializovaný JSON string (maxDepth = 3).
+    /// </summary>
+    private static JsonNode? ParsePossiblyNestedJson(object? input, int maxDepth = 3)
+    {
+        if (input is null) return null;
+
+        // 1) Získej raw JSON text
+        string? jsonText = input switch
+        {
+            string s => s,
+            JsonElement e => e.GetRawText(),
+            JsonNode n => n.ToJsonString(),
+            _ => input.ToString()
+        };
+
+        if (string.IsNullOrWhiteSpace(jsonText))
+            return null;
+
+        // 2) Zkus opakovaně parsovat – když je to string uvnitř stringu uvnitř JSONu, postupně loupat
+        for (int i = 0; i < maxDepth; i++)
+        {
+            try
+            {
+                var node = JsonNode.Parse(jsonText);
+                if (node is JsonValue jsonValue && jsonValue.TryGetValue<string>(out var innerString))
+                {
+                    // JSON je "string s JSONem", oloupej vrstvu a zkus znovu
+                    jsonText = innerString;
+                    continue;
+                }
+
+                // Máme JsonObject/JsonArray → hotovo
+                return node;
+            }
+            catch (JsonException)
+            {
+                // není validní JSON; skonči
+                return null;
+            }
+        }
+
+        return null;
+    }
+    
+    /// <summary>
+    /// Bezpečně se zkusí dostat na cestu vlastností; vrací true/false a out uzel.
+    /// Nevyhazuje výjimky, když narazí na ne-objekt.
+    /// </summary>
+    private static bool TryGetPath(JsonNode? start, out JsonNode? node, params string[] path)
+    {
+        node = start;
+        foreach (var segment in path)
+        {
+            if (node is null) return false;
+            if (node is not JsonObject obj) return false;
+            if (!obj.TryGetPropertyValue(segment, out node)) return false;
+        }
+        return node is not null;
+    }
+
     public async Task<FlowableJobHandlerResult> HandleAsync(FlowableJobContext context, CancellationToken cancellationToken)
     {
 
@@ -37,7 +100,32 @@ public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
 
         context.Variables.TryGetValue("JsonPayload", out var inputPayload);
 
-        var payload = HttpExternalTaskHandlerHelper.CreatePayload(context, _workerId, inputPayload);
+        _logger.LogInformation($"Processing job {context.Job.Id} worker={_workerId} with payload={inputPayload}");
+
+        _logger.LogInformation($"Job variables: {JsonSerializer.Serialize(context.Variables, HttpExternalTaskHandlerHelper.JsonOptions)}");
+
+        var root = ParsePossiblyNestedJson(inputPayload);
+        if (root is null)
+        {
+            _logger.LogWarning("JsonPayload je prázdný nebo neplatný JSON.");
+        }
+
+        TryGetPath(root, out var variablesNode, "payload","inputPayload","data");
+
+        var payload = new HttpExternalTaskPayload(
+            _workerId,
+            DateTimeOffset.UtcNow.ToString("o"),
+            new
+            {
+                context.Job.Id,
+                context.Job.ProcessInstanceId,
+                context.Job.ExecutionId,
+                //context.Variables,
+                variablesNode
+            }
+            );
+
+        _logger.LogDebug("Payload: {Payload}", JsonSerializer.Serialize(payload, HttpExternalTaskHandlerHelper.JsonOptions));
 
         using var content = new StringContent(
             JsonSerializer.Serialize(payload, HttpExternalTaskHandlerHelper.JsonOptions),
@@ -91,10 +179,13 @@ public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
             new("JsonResponsePayload", responseValue, responseType == "json" ? "json" : "string"),
         };
 
+        _logger.LogInformation("JsonResponsePayload: {JsonResponsePayload}", JsonSerializer.Serialize(responseValue, HttpExternalTaskHandlerHelper.JsonOptions));
+
         _logger.LogInformation(
-            "External call succeeded status={Status} elapsedMs={Elapsed}",
+            "External call succeeded status={Status} elapsedMs={Elapsed} worker={WorkerId}",
             (int)response.StatusCode,
-            stopwatch.ElapsedMilliseconds);
+            stopwatch.ElapsedMilliseconds,
+            _workerId);
 
         return new FlowableJobHandlerResult(variables);
     }

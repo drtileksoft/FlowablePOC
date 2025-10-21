@@ -66,7 +66,7 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
             {
                 if (ShouldPause(tz))
                 {
-                    _logger.LogInformation("Worker paused due to configured window");
+                    _logger.LogInformation($"Worker {workerId} paused due to configured window");
                     await Task.Delay(TimeSpan.FromSeconds(pollSeconds), stoppingToken);
                     continue;
                 }
@@ -82,10 +82,11 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
                 {
                     var error = await acquireResponse.Content.ReadAsStringAsync(stoppingToken);
                     _logger.LogWarning(
-                        "Acquire failed status={Status} elapsedMs={Elapsed} response={Response}",
+                        "Acquire failed status={Status} elapsedMs={Elapsed} response={Response} worker={WorkerId}",
                         (int)acquireResponse.StatusCode,
                         swAcquire.ElapsedMilliseconds,
-                        error);
+                        error,
+                        workerId);
                     await Task.Delay(TimeSpan.FromSeconds(pollSeconds), stoppingToken);
                     continue;
                 }
@@ -94,9 +95,10 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
                 var jobs = JsonSerializer.Deserialize<List<FlowableJob>>(payload, SerializerOptions) ?? new();
 
                 _logger.LogInformation(
-                    "Acquire ok jobs={Count} elapsedMs={Elapsed}",
+                    "Acquire ok jobs={Count} elapsedMs={Elapsed} worker={WorkerId}",
                     jobs.Count,
-                    swAcquire.ElapsedMilliseconds);
+                    swAcquire.ElapsedMilliseconds,
+                    workerId);
 
                 if (jobs.Count == 0)
                 {
@@ -121,7 +123,7 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
             await Task.Delay(TimeSpan.FromSeconds(pollSeconds), stoppingToken);
         }
 
-        _logger.LogInformation("Worker stopped");
+        _logger.LogInformation($"Worker {workerId} stopped");
     }
 
     private bool ShouldPause(TimeZoneInfo tz)
@@ -153,7 +155,7 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
             var context = new FlowableJobContext(job, job.VariablesAsDictionary);
             var result = await _handler.HandleAsync(context, ct);
             await CompleteAsync(flowableClient, job.Id, _options.WorkerId, result, ct);
-            _logger.LogInformation("Job completed");
+            _logger.LogInformation($"Job completed worker={_options.WorkerId}");
         }
         catch (FlowableJobRetryException retry)
         {
