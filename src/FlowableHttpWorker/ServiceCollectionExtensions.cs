@@ -8,7 +8,7 @@ namespace FlowableHttpWorker;
 
 public static class ServiceCollectionExtensions
 {
-    private const string FlowableSectionName = "Flowable";
+    private const string FlowableSectionName = "FlowableRest";
     private const string WorkersSectionName = "FlowableWorkers";
     private const string FlowableOptionsSectionName = "Flowable";
     private const string HttpOptionsSectionName = "Http";

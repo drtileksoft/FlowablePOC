@@ -15,15 +15,15 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var flowableSection = configuration.GetSection("Flowable");
+        var flowableSection = configuration.GetSection("FlowableRest");
         if (!flowableSection.Exists())
         {
-            throw new InvalidOperationException("Flowable section is required in configuration.");
+            throw new InvalidOperationException("FlowableRest section is required in configuration.");
         }
 
         var clientSection = flowableSection.GetSection("Client");
         var clientOptions = clientSection.Get<FlowableClientOptions>()
-            ?? throw new InvalidOperationException("Flowable:Client section is required in configuration.");
+            ?? throw new InvalidOperationException("FlowableRest:Client section is required in configuration.");
 
         return services.AddFlowableClientCore(clientOptions);
     }
