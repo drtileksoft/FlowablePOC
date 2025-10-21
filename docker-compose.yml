@@ -52,6 +52,12 @@ services:
     build: .
     image: flowable-http-worker:latest
     restart: unless-stopped
+    environment:
+      FLOWABLE_WORKERS__HTTPEXTERNALTASKHANDLER__ENDPOINT__URL: http://127.0.0.1:5005/api/events
+      FLOWABLE_WORKERS__HTTPEXTERNALTASKHANDLER2__ENDPOINT__URL: http://127.0.0.1:5005/api/events
+      HTTP_LOG_API_PORT: 5005
+    ports:
+      - "5005:5005"
 
 volumes:
   dbdata:
