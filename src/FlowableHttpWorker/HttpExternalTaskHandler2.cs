@@ -35,9 +35,9 @@ public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        var input = context.Variables.TryGetValue("JsonPayload", out var forwarded) ? forwarded : null;
+        context.Variables.TryGetValue("JsonPayload", out var inputPayload);
 
-        var payload = HttpExternalTaskHandlerHelper.CreatePayload(context, _workerId, input);
+        var payload = HttpExternalTaskHandlerHelper.CreatePayload(context, _workerId, inputPayload);
 
         using var content = new StringContent(
             JsonSerializer.Serialize(payload, HttpExternalTaskHandlerHelper.JsonOptions),
@@ -80,14 +80,7 @@ public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
             }
         }
 
-        var headersDict = response.Headers
-            .SelectMany(h => h.Value.Select(v => (h.Key, v)))
-            .Concat(response.Content.Headers.SelectMany(h => h.Value.Select(v => (h.Key, v))))
-            .GroupBy(h => h.Key, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                g => g.Key,
-                g => g.Select(t => t.v).ToArray(),
-                StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, string[]> headersDict = HttpExternalTaskHandlerHelper.GetResponseHeaders(response);
 
         var variables = new List<FlowableVariable>
         {

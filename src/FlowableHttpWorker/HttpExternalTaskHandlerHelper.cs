@@ -14,17 +14,15 @@ internal static class HttpExternalTaskHandlerHelper
     public static HttpExternalTaskPayload CreatePayload(
         FlowableJobContext context,
         string workerId,
-        object? forwardedResult)
+        object? payload)
         => new(
             workerId,
             DateTimeOffset.UtcNow.ToString("o"),
-            new HttpExternalTaskPayloadData(
-                "external-worker",
-                context.Job.Id,
-                context.Job.ProcessInstanceId,
-                context.Job.ExecutionId,
-                context.Variables,
-                forwardedResult));
+            context.Job.Id,
+            context.Job.ProcessInstanceId,
+            context.Job.ExecutionId,
+            context.Variables,
+            payload);
 
     public static bool IsJson(string? contentType, string trimmed)
         => (!string.IsNullOrEmpty(contentType) && contentType.Contains("json", StringComparison.OrdinalIgnoreCase))
@@ -48,17 +46,25 @@ internal static class HttpExternalTaskHandlerHelper
             return false;
         }
     }
+
+    public static Dictionary<string, string[]> GetResponseHeaders(HttpResponseMessage response)
+    {
+        return response.Headers
+                    .SelectMany(h => h.Value.Select(v => (h.Key, v)))
+                    .Concat(response.Content.Headers.SelectMany(h => h.Value.Select(v => (h.Key, v))))
+                    .GroupBy(h => h.Key, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Select(t => t.v).ToArray(),
+                        StringComparer.OrdinalIgnoreCase);
+    }
 }
 
 internal sealed record HttpExternalTaskPayload(
     [property: JsonPropertyName("id")] string Id,
     [property: JsonPropertyName("clientTs")] string ClientTs,
-    [property: JsonPropertyName("data")] HttpExternalTaskPayloadData Data);
-
-internal sealed record HttpExternalTaskPayloadData(
-    [property: JsonPropertyName("note")] string Note,
     [property: JsonPropertyName("jobId")] string JobId,
     [property: JsonPropertyName("pi")] string ProcessInstanceId,
     [property: JsonPropertyName("exec")] string ExecutionId,
     [property: JsonPropertyName("variables")] IReadOnlyDictionary<string, object?> Variables,
-    [property: JsonPropertyName("forwardedResult")] object? ForwardedResult);
+    [property: JsonPropertyName("payload")] object? payload);
