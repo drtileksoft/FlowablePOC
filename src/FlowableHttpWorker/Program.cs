@@ -10,9 +10,6 @@ builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
     .AddEnvironmentVariables();
 
-var configuredLevel = builder.Configuration["Worker:LogLevel"];
-var minLevel = Enum.TryParse<LogLevel>(configuredLevel, true, out var lvl) ? lvl : LogLevel.Debug;
-
 builder.Logging.ClearProviders();
 builder.Logging.AddSimpleConsole(o =>
 {
@@ -20,7 +17,7 @@ builder.Logging.AddSimpleConsole(o =>
     o.SingleLine = true;
     o.TimestampFormat = "yyyy-MM-dd HH:mm:ss.fff zzz ";
 });
-builder.Logging.SetMinimumLevel(minLevel);
+builder.Logging.SetMinimumLevel(LogLevel.Debug);
 
 builder.Services.Configure<HostOptions>(options =>
 {
