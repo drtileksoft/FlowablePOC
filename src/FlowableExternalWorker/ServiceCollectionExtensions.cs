@@ -1,4 +1,3 @@
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using Microsoft.Extensions.Configuration;
@@ -13,12 +12,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddFlowableClient(
         this IServiceCollection services,
         IConfiguration configuration)
-        => services.AddFlowableClient(configuration, out _);
-
-    public static IServiceCollection AddFlowableClient(
-        this IServiceCollection services,
-        IConfiguration configuration,
-        out FlowableClientOptions clientOptions)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
@@ -29,7 +22,7 @@ public static class ServiceCollectionExtensions
         }
 
         var clientSection = flowableSection.GetSection("Client");
-        clientOptions = clientSection.Get<FlowableClientOptions>()
+        var clientOptions = clientSection.Get<FlowableClientOptions>()
             ?? throw new InvalidOperationException("Flowable:Client section is required in configuration.");
 
         return services.AddFlowableClientCore(clientOptions);
