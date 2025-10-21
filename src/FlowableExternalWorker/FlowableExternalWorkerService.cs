@@ -56,7 +56,8 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
         var maxJobs = _options.MaxJobsPerTick;
         var pollSeconds = _options.PollPeriodSeconds;
         var mdop = _options.MaxDegreeOfParallelism;
-        var tz = TimeZoneInfo.FindSystemTimeZoneById(_options.TimeZoneId);
+        var timeZoneId = _options.TimeWindow.TimeZoneId;
+        var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
 
         _logger.LogInformation(
             "Worker starting topic={Topic} worker={WorkerId} poll={Poll}s mdop={Mdop} maxJobs={MaxJobs} lock={Lock}",
@@ -128,14 +129,15 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
 
     private bool ShouldPause(TimeZoneInfo tz)
     {
-        if (_options.PauseFromHour is null || _options.PauseToHourExclusive is null)
+        var window = _options.TimeWindow;
+        if (window.PauseFromHour is null || window.PauseToHourExclusive is null)
         {
             return false;
         }
 
         var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
         var hour = nowLocal.Hour;
-        return hour >= _options.PauseFromHour && hour < _options.PauseToHourExclusive;
+        return hour >= window.PauseFromHour && hour < window.PauseToHourExclusive;
     }
 
     private async Task ProcessJobAsync(HttpClient flowableClient, FlowableJob job, SemaphoreSlim throttler, CancellationToken ct)
