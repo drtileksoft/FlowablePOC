@@ -1,8 +1,10 @@
-using Flowable.ExternalWorker;
-using Microsoft.Extensions.Logging;
+using System;
 using System.Diagnostics;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using Flowable.ExternalWorker;
+using Microsoft.Extensions.Logging;
 
 namespace FlowableHttpWorker;
 
@@ -10,34 +12,46 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<HttpExternalTaskHandler> _logger;
-    private readonly HttpWorkerRuntimeOptions _options;
+    private readonly string _workerId;
+    private readonly string _targetUrl;
+    private readonly string _httpClientName;
 
     public HttpExternalTaskHandler(
-        HttpWorkerRuntimeOptions options,
+        string workerId,
+        HttpTaskEndpointOptions httpOptions,
         IHttpClientFactory httpClientFactory,
         ILogger<HttpExternalTaskHandler> logger)
     {
-        _options = options;
-        _httpClientFactory = httpClientFactory;
-        _logger = logger;
+        _workerId = string.IsNullOrWhiteSpace(workerId)
+            ? throw new ArgumentException("WorkerId must be provided", nameof(workerId))
+            : workerId;
+        ArgumentNullException.ThrowIfNull(httpOptions);
+        _targetUrl = string.IsNullOrWhiteSpace(httpOptions.TargetUrl)
+            ? throw new ArgumentException("TargetUrl must be provided", nameof(httpOptions))
+            : httpOptions.TargetUrl;
+        _httpClientName = string.IsNullOrWhiteSpace(httpOptions.HttpClientName)
+            ? throw new ArgumentException("HttpClientName must be provided", nameof(httpOptions))
+            : httpOptions.HttpClientName;
+        _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     public async Task<FlowableJobHandlerResult> HandleAsync(FlowableJobContext context, CancellationToken cancellationToken) {
 
-        var httpClient = _httpClientFactory.CreateClient(_options.HttpClientName);
+        var httpClient = _httpClientFactory.CreateClient(_httpClientName);
 
         var input = context.Variables.TryGetValue("JsonPayload", out var forwarded) ? forwarded : null;
 
-        var payload = HttpExternalTaskHandlerHelper.CreatePayload(context, _options.WorkerId, input);
+        var payload = HttpExternalTaskHandlerHelper.CreatePayload(context, _workerId, input);
 
         using var content = new StringContent(
             JsonSerializer.Serialize(payload, HttpExternalTaskHandlerHelper.JsonOptions),
             Encoding.UTF8,
             "application/json");
 
-        _logger.LogInformation("Calling external service {Url}", _options.TargetUrl);
+        _logger.LogInformation("Calling external service {Url}", _targetUrl);
         var stopwatch = Stopwatch.StartNew();
-        using var response = await httpClient.PostAsync(_options.TargetUrl, content, cancellationToken);
+        using var response = await httpClient.PostAsync(_targetUrl, content, cancellationToken);
         stopwatch.Stop();
 
         if (!response.IsSuccessStatusCode)
@@ -47,7 +61,7 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
                 (int)response.StatusCode,
                 stopwatch.ElapsedMilliseconds);
             throw new FlowableJobRetryException(
-                $"Call to {_options.TargetUrl} failed with {(int)response.StatusCode}");
+                $"Call to {_targetUrl} failed with {(int)response.StatusCode}");
         }
 
         var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
