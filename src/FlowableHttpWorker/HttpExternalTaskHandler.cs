@@ -6,7 +6,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Flowable.ExternalWorker;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 namespace FlowableHttpWorker;
@@ -19,27 +18,24 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
     };
 
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IConfiguration _configuration;
     private readonly ILogger<HttpExternalTaskHandler> _logger;
-    private readonly WorkerOptions _options;
+    private readonly HttpWorkerRuntimeOptions _options;
 
     public HttpExternalTaskHandler(
-        WorkerOptions options,
+        HttpWorkerRuntimeOptions options,
         IHttpClientFactory httpClientFactory,
-        IConfiguration configuration,
         ILogger<HttpExternalTaskHandler> logger)
     {
         _options = options;
         _httpClientFactory = httpClientFactory;
-        _configuration = configuration;
         _logger = logger;
     }
 
     public async Task<FlowableJobHandlerResult> HandleAsync(FlowableJobContext context, CancellationToken cancellationToken)
     {
-        var srdClient = _httpClientFactory.CreateClient("srd");
-        var workerId = _options.WorkerId ?? _configuration["Flowable:WorkerId"] ?? "srd-worker-1";
-        var targetUrl = _options.TargetUrl ?? _configuration["SRD:Url"] ?? throw new InvalidOperationException("SRD:Url missing");
+        var srdClient = _httpClientFactory.CreateClient(_options.HttpClientName);
+        var workerId = _options.WorkerId;
+        var targetUrl = _options.TargetUrl;
 
         var payload = new
         {
