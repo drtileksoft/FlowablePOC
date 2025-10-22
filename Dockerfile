@@ -2,6 +2,11 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
+# Clean any local build outputs that might have been copied from the workspace.
+RUN for project in FlowableExternalWorker FlowableHttpWorker HttpLogApi; do \
+        rm -rf "./src/${project}/bin" "./src/${project}/obj"; \
+    done
+
 # Restore all projects via the solution to leverage caching.
 COPY ./src/FlowableWorker.sln ./
 COPY ./src/FlowableExternalWorker/FlowableExternalWorker.csproj ./FlowableExternalWorker/
@@ -11,10 +16,6 @@ RUN dotnet restore FlowableWorker.sln
 
 # Copy the remaining source and publish the worker + local HttpLogApi.
 COPY ./src ./
-# Clean any local build outputs that might have been copied from the workspace.
-RUN for project in FlowableExternalWorker FlowableHttpWorker HttpLogApi; do \
-        rm -rf "./${project}/bin" "./${project}/obj"; \
-    done
 RUN dotnet publish FlowableHttpWorker/FlowableHttpWorker.csproj -c Release -o /app/publish/FlowableHttpWorker --no-restore \
     && dotnet publish HttpLogApi/HttpLogApi.csproj -c Release -o /app/publish/HttpLogApi --no-restore
 

@@ -68,12 +68,12 @@ services:
       - -c
     command: >-
       set -euo pipefail;
-      for attempt in $(seq 1 24); do
+       for attempt in $$(seq 1 24); do
         if curl --fail --silent --user rest-admin:test \
           http://flowable-rest:8080/flowable-rest/service/management/engine >/dev/null; then
           break;
         fi;
-        if [ "$attempt" -eq 24 ]; then
+        if [ "$$attempt" -eq 24 ]; then
           echo "flowable-rest is not ready for deployment" >&2;
           exit 1;
         fi;
