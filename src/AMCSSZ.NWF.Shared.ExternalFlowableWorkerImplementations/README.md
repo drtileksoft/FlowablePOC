@@ -2,7 +2,7 @@
 
 Tento projekt obsahuje sdílené implementace Flowable external workerů, které lze využít
 v libovolném hostu. Primárně jej používá ukázková konzolová aplikace
-[`FlowableHttpWorker`](../FlowableHttpWorker/README.md).
+[`AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample`](../AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample/README.md).
 
 ## Struktura projektu
 
@@ -22,7 +22,7 @@ v libovolném hostu. Primárně jej používá ukázková konzolová aplikace
 
 ## Použití v host aplikaci
 
-1. Přidejte referenci na projekt `FlowableExternalWorkerImplementations`.
+1. Přidejte referenci na projekt `AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations`.
 2. V registraci služeb zavolejte jednu z extension metod, např.
 
    ```csharp

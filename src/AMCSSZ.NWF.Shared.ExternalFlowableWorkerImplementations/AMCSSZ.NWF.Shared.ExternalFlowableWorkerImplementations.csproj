@@ -12,6 +12,6 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="../FlowableExternalWorker/FlowableExternalWorker.csproj" />
+    <ProjectReference Include="../AMCSSZ.NWF.Shared.ExternalFlowableWorker/AMCSSZ.NWF.Shared.ExternalFlowableWorker.csproj" />
   </ItemGroup>
 </Project>
