@@ -36,50 +36,28 @@ public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
 
         var httpClient = _httpClientFactory.CreateClient();
 
-        context.Variables.TryGetValue("JsonPayload", out var inputPayload);
+        context.Variables.TryGetValue("JsonPayload", out var rawPayload);
 
-        _logger.LogInformation($"Processing job {context.Job.Id} worker={_workerId} with payload={inputPayload}");
+        _logger.LogInformation($"Processing job {context.Job.Id} worker={_workerId} with payload={rawPayload}");
 
         _logger.LogInformation($"Job variables: {JsonSerializer.Serialize(context.Variables, HttpExternalTaskHandlerHelper.JsonOptions)}");
 
-        // deserialize inputPayload to Dictionary<string, object?>
-        Dictionary<string, object?>? inputPayloadDict = null;
-        if (inputPayload != null)
+        var value = string.Empty;
+
+        if (JsonHelpers.TryGetByPath(rawPayload, 
+            out var jsonElementByPath, 
+            _logger, 
+            HttpExternalTaskHandlerHelper.JsonOptions,
+            5, 
+            "payload", "inputPayload", "data"))
         {
-            try
-            {
-                inputPayloadDict = JsonSerializer.Deserialize<Dictionary<string, object?>>(inputPayload.ToString() ?? "", HttpExternalTaskHandlerHelper.JsonOptions);
-            }
-            catch (JsonException ex)
-            {
-                _logger.LogWarning(ex, "Failed to deserialize input payload to dictionary");
-            }
+            value = JsonSerializer.Serialize(jsonElementByPath, HttpExternalTaskHandlerHelper.JsonOptions);
+            _logger.LogInformation("jsonElementByPath: {Payload}", value);
         }
-
-        var value = inputPayloadDict["payload"];
-
-        // deserialize value to Dictionary<string, object?>, its probably stringified json
-        if (value is not null)
+        else
         {
-            if (JsonHelpers.TryGetInputPayload(value, out var inputPayload2, "inputPayload", _logger, HttpExternalTaskHandlerHelper.JsonOptions))
-            {
-                // inputPayload je JsonElement; mùže být Object/Array/Primitive
-                // Pro log: serializujeme pøes System.Text.Json
-                var payloadForLog = JsonSerializer.Serialize(inputPayload2, HttpExternalTaskHandlerHelper.JsonOptions);
-                _logger.LogInformation("Deserialized inputPayload: {Payload}", payloadForLog);
-
-                // Pokud chcete zkusit pøevést na konkrétní typ:
-                // var typed = inputPayload.Deserialize<MyDto>(HttpExternalTaskHandlerHelper.JsonOptions);
-                // _logger.LogInformation("Typed payload: {@Typed}", typed);
-            }
-            else
-            {
-                _logger.LogWarning("Failed to extract inputPayload from value.");
-            }
+            _logger.LogWarning("ByPath not found: ...");
         }
-
-
-
 
         var payload = new HttpExternalTaskPayload(
             _workerId,
