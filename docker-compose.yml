@@ -1,13 +1,4 @@
 services:
-  clean-workspace:
-    image: alpine:3.19
-    container_name: flowable-clean-workspace
-    command: >-
-      sh -c "find /workspace -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} +"
-    volumes:
-      - ./:/workspace
-    restart: "no"
-
   db:
     image: postgres:15
     container_name: flowable-db
@@ -32,8 +23,6 @@ services:
     container_name: flowable-rest
     platform: linux/amd64          # <<< emulace x86_64
     depends_on:
-      clean-workspace:
-        condition: service_completed_successfully
       db:
         condition: service_healthy
     environment:
