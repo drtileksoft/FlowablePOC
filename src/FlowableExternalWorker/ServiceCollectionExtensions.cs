@@ -6,7 +6,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Flowable.ExternalWorker;
+namespace AMCSSZ.NWF.Shared.ExternalFlowableWorker;
 
 public static class ServiceCollectionExtensions
 {

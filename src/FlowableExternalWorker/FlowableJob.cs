@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 
-namespace Flowable.ExternalWorker;
+namespace AMCSSZ.NWF.Shared.ExternalFlowableWorker;
 
 public sealed record FlowableVariable(
     [property: JsonPropertyName("name")] string Name,

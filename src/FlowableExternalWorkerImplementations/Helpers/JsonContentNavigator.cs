@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
-namespace Flowable.ExternalWorkerImplementations.Helpers;
+namespace AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations.Helpers;
 
 public static class JsonContentNavigator
 {
