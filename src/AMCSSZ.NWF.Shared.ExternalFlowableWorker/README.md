@@ -12,7 +12,7 @@ kteří zpracovávají Flowable external jobs. Balík poskytuje hotovou hostovan
   který se aplikuje na `FlowableJobRetryException`.
 - **Finální selhání** – podle akce v `FlowableJobFinalException` knihovna volá Flowable REST API
   pro incident, dokončení nebo BPMN error.
-- **Časová okna** – `TimeWindow` umožňuje worker pauzovat v definovaném časovém rozsahu.
+- **Časová okna** – `TimeWindow` umožňuje worker pauzovat v definovaném časovém rozsahu nebo nastavit detailní denní rozvrh.
 
 Klíčové třídy najdete v:
 
@@ -26,6 +26,12 @@ Klíčové třídy najdete v:
 `FlowableWorkerOptions` nastavuje identifikaci workera, téma (`topic`), velikost
 zámku (`lockDuration`) a další parametry. Vzorek konfigurace najdete v souboru
 `src/AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample/appsettings.json`.
+
+Denní rozvrh práce se nastavuje pomocí sekce `TimeWindow.DailySchedules`. Každý den
+(`Monday`–`Sunday`) může mít vlastní seznam aktivních oken s přesností na čas
+(`Start`, `End`) nebo může být zcela vypnut (`Enabled: false`). Pokud seznam oken
+chybí, worker zůstává aktivní po celý daný den. Při chybějící konfiguraci se použije
+globální pauza `PauseFromHour`/`PauseToHourExclusive`.
 
 ```json
 {

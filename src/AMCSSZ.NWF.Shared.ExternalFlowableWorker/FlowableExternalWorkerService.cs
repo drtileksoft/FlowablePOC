@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -42,6 +44,8 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
         {
             throw new ArgumentException("WorkerId must be provided", nameof(options));
         }
+
+        ValidateTimeWindowConfiguration();
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -129,14 +133,60 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
     private bool ShouldPause(TimeZoneInfo tz)
     {
         var window = _options.TimeWindow;
+        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
+
+        if (window.DailySchedules is { Count: > 0 })
+        {
+            if (!window.DailySchedules.TryGetValue(nowLocal.DayOfWeek, out var schedule) || schedule is null)
+            {
+                return false;
+            }
+
+            return !schedule.IsActiveAt(nowLocal.TimeOfDay);
+        }
+
         if (window.PauseFromHour is null || window.PauseToHourExclusive is null)
         {
             return false;
         }
 
-        var nowLocal = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, tz);
         var hour = nowLocal.Hour;
         return hour >= window.PauseFromHour && hour < window.PauseToHourExclusive;
+    }
+
+    private void ValidateTimeWindowConfiguration()
+    {
+        var schedules = _options.TimeWindow?.DailySchedules;
+        if (schedules is null || schedules.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var (day, schedule) in schedules)
+        {
+            if (schedule?.ActiveWindows is null)
+            {
+                continue;
+            }
+
+            foreach (var window in schedule.ActiveWindows)
+            {
+                if (window is null)
+                {
+                    _logger.LogWarning("Time window configuration for {Day} contains a null entry. The entry will be ignored.", day);
+                    continue;
+                }
+
+                if (!window.IsValid())
+                {
+                    _logger.LogWarning(
+                        "Time window configuration for {Day} has invalid range: start={Start} end={End}. Values must satisfy 00:00 <= start < end <= 24:00.",
+                        day,
+                        window.Start,
+                        window.End);
+                }
+            }
+        }
     }
 
     private async Task ProcessJobAsync(HttpClient flowableClient, FlowableJob job, SemaphoreSlim throttler, CancellationToken ct)
