@@ -42,6 +42,10 @@ curl -u rest-admin:test "http://localhost:8090/flowable-rest/service/runtime/pro
 http://localhost:8090/flowable-rest/docs/?url=specfile/external-worker/flowable-swagger-external-worker.json#/Acquire_and_Execute
 ## External worker sequencing example
 
+# version of flowable
+curl -X GET --header 'Accept: application/json' 'https://flowable-pokusy-rest.evidencz.dev/flowable-rest/service/management/engine'
+
+
 Flowable waits for an external service task to be completed (via the `/acquire/jobs/{id}/complete` REST call) before it continues to the next step in the process. That means you can model two consecutive external tasks and the second one will only be acquired after the worker finished the first one successfully.
 
 ```xml
