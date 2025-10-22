@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
 namespace AMCSSZ.NWF.Shared.ExternalFlowableWorker;
 
 public sealed class FlowableWorkerOptions
@@ -30,6 +34,74 @@ public sealed class FlowableWorkerTimeWindowOptions
 
     public int? PauseToHourExclusive { get; set; }
         = null;
+
+    public Dictionary<DayOfWeek, FlowableWorkerDailySchedule> DailySchedules { get; set; } = new();
+}
+
+public sealed class FlowableWorkerDailySchedule
+{
+    public bool Enabled { get; set; } = true;
+
+    public List<FlowableWorkerDailyWindow> ActiveWindows { get; set; } = new();
+
+    internal bool IsActiveAt(TimeSpan time)
+    {
+        if (!Enabled)
+        {
+            return false;
+        }
+
+        if (ActiveWindows is null || ActiveWindows.Count == 0)
+        {
+            return true;
+        }
+
+        var hasValidWindow = false;
+
+        foreach (var window in ActiveWindows)
+        {
+            if (window is null || !window.IsValid())
+            {
+                continue;
+            }
+
+            hasValidWindow = true;
+
+            if (window.Contains(time))
+            {
+                return true;
+            }
+        }
+
+        return !hasValidWindow;
+    }
+}
+
+public sealed class FlowableWorkerDailyWindow
+{
+    private static readonly TimeSpan EndOfDay = TimeSpan.FromHours(24);
+
+    public TimeSpan Start { get; set; } = TimeSpan.Zero;
+
+    public TimeSpan End { get; set; } = EndOfDay;
+
+    internal bool Contains(TimeSpan time)
+    {
+        if (!IsValid())
+        {
+            return false;
+        }
+
+        return time >= Start && time < End;
+    }
+
+    internal bool IsValid()
+    {
+        return Start >= TimeSpan.Zero
+            && Start < EndOfDay
+            && End > Start
+            && End <= EndOfDay;
+    }
 }
 
 public sealed class RetryOptions
