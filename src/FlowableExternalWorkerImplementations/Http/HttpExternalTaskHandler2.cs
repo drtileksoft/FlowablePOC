@@ -1,11 +1,12 @@
-using System.Diagnostics;
-using System.Net.Http;
-using System.Net;
-using System.Text;
-using System.Text.Json;
 using Flowable.ExternalWorker;
 using Flowable.ExternalWorkerImplementations.Helpers;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Flowable.ExternalWorkerImplementations.Http;
 
@@ -32,7 +33,12 @@ public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
         _httpClientFactory = httpClientFactory ?? throw new ArgumentNullException(nameof(httpClientFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
-    
+
+    internal sealed record HttpExternalTaskRequestPayload(
+        [property: JsonPropertyName("id")] string Id,
+        [property: JsonPropertyName("clientTs")] string ClientTimestamp,
+        [property: JsonPropertyName("data")] object? Data);
+
     public async Task<FlowableJobHandlerResult> HandleAsync(FlowableJobContext context, CancellationToken cancellationToken)
     {
 

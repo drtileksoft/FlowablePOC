@@ -48,7 +48,4 @@ internal static class HttpResponseContentInspector
     }
 }
 
-internal sealed record HttpExternalTaskRequestPayload(
-    [property: JsonPropertyName("id")] string Id,
-    [property: JsonPropertyName("clientTs")] string ClientTimestamp,
-    [property: JsonPropertyName("data")] object? Data);
+
