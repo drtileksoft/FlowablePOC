@@ -37,10 +37,10 @@ pack_and_push_on_tag:
     # verze = tag bez úvodního "v"
     - $version = $env:CI_COMMIT_TAG.TrimStart('v')
     - Write-Host "Packing RELEASE version $version"
-    - dotnet restore AMCSSZ.CodeLists/AMCSSZ.CodeLists.sln
-    - dotnet build   AMCSSZ.CodeLists/AMCSSZ.CodeLists.sln -c Release /p:Version=$version
-    - dotnet pack    AMCSSZ.CodeLists/AMCSSZ.CodeLists.Loader/AMCSSZ.CodeLists.Loader.csproj       -c Release /p:Version=$version --no-build -o .artifacts/nuget
-    - dotnet pack    AMCSSZ.CodeLists/AMCSSZ.CodeLists.Instances/AMCSSZ.CodeLists.Instances.csproj -c Release /p:Version=$version --no-build -o .artifacts/nuget
+    - dotnet restore src/FlowableWorker.sln
+    - dotnet build   src/FlowableWorker.sln -c Release /p:Version=$version
+    - dotnet pack src/AMCSSZ.NWF.Shared.ExternalFlowableWorker/AMCSSZ.NWF.Shared.ExternalFlowableWorker.csproj -c Release /p:Version=$version --no-build -o .artifacts/nuget
+    - dotnet pack src/AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations/AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations.csproj -c Release /p:Version=$version --no-build -o .artifacts/nuget
     - *add_gitlab_source
     # robustní push na Windows – rozbalíme wildcards
     - Get-ChildItem ".artifacts/nuget/*.nupkg" | ForEach-Object { dotnet nuget push $_.FullName --source gitlab --skip-duplicate }
@@ -58,10 +58,10 @@ pack_and_push_on_main:
     # stabilní verze bez sufixu; pipeline IID jako revize
     - $version = "$env:MAJOR.$env:MINOR.$env:PATCH.$env:CI_PIPELINE_IID"
     - Write-Host "Packing RELEASE version $version (main)"
-    - dotnet restore AMCSSZ.CodeLists/AMCSSZ.CodeLists.sln
-    - dotnet build   AMCSSZ.CodeLists/AMCSSZ.CodeLists.sln -c Release /p:Version=$version
-    - dotnet pack    AMCSSZ.CodeLists/AMCSSZ.CodeLists.Loader/AMCSSZ.CodeLists.Loader.csproj       -c Release /p:Version=$version --no-build -o .artifacts/nuget
-    - dotnet pack    AMCSSZ.CodeLists/AMCSSZ.CodeLists.Instances/AMCSSZ.CodeLists.Instances.csproj -c Release /p:Version=$version --no-build -o .artifacts/nuget
+    - dotnet restore src/FlowableWorker.sln
+    - dotnet build   src/FlowableWorker.sln -c Release /p:Version=$version
+    - dotnet pack src/AMCSSZ.NWF.Shared.ExternalFlowableWorker/AMCSSZ.NWF.Shared.ExternalFlowableWorker.csproj -c Release /p:Version=$version --no-build -o .artifacts/nuget
+    - dotnet pack src/AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations/AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations.csproj -c Release /p:Version=$version --no-build -o .artifacts/nuget
     - *add_gitlab_source
     - Get-ChildItem ".artifacts/nuget/*.nupkg" | ForEach-Object { dotnet nuget push $_.FullName --source gitlab --skip-duplicate }
   artifacts:
