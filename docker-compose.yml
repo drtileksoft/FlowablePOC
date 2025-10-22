@@ -43,47 +43,32 @@ services:
       - ./addons:/additional-classpath:ro
     healthcheck:
       test:
-        - CMD
-        - bash
-        - -c
-        - >-
-          exec 3<>/dev/tcp/127.0.0.1/8080 &&
-          printf 'GET /flowable-rest/service/management/engine HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Basic cmVzdC1hZG1pbjp0ZXN0\r\nConnection: close\r\n\r\n' >&3 &&
-          IFS=$'\r\n' read -r status <&3 &&
-          [[ "$status" == "HTTP/1.1 200"* ]]
-      interval: 15s
+        - CMD-SHELL
+        - >
+          wget -q --spider -T 5
+          --header 'Authorization: Basic cmVzdC1hZG1pbjp0ZXN0'
+          http://127.0.0.1:8080/flowable-rest/service/management/engine
+          || exit 1
+      interval: 30s
       timeout: 10s
-      retries: 20
+      retries: 3
+      start_period: 30s
 
   deploy-process:
-    image: curlimages/curl:8.6.0
+    image: curlimages/curl:latest
     container_name: flowable-deploy-process
     depends_on:
       flowable-rest:
         condition: service_healthy
     volumes:
-      - ./srd-process.bpmn20.xml:/deployments/srd-process.bpmn20.xml:ro
-    entrypoint:
-      - /bin/sh
-      - -c
-    command: >-
-      set -euo pipefail;
-       for attempt in $$(seq 1 24); do
-        if curl --fail --silent --user rest-admin:test \
-          http://flowable-rest:8080/flowable-rest/service/management/engine >/dev/null; then
-          break;
-        fi;
-        if [ "$$attempt" -eq 24 ]; then
-          echo "flowable-rest is not ready for deployment" >&2;
-          exit 1;
-        fi;
-        sleep 5;
-      done;
-      curl --fail --show-error --user rest-admin:test -X POST \
-        http://flowable-rest:8080/flowable-rest/service/repository/deployments \
-        -H "Content-Type: multipart/form-data" \
-        -F file=@/deployments/srd-process.bpmn20.xml
+      - ./srd-process.bpmn20.xml:/tmp/srd-process.bpmn20.xml:ro
+    command: -v --fail --show-error -u rest-admin:test --form "file=@/tmp/srd-process.bpmn20.xml;type=application/xml" http://flowable-rest:8080/flowable-rest/service/repository/deployments
     restart: "no"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   flowable-http-worker:
     build: .
