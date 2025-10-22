@@ -23,7 +23,7 @@ Klíčové třídy najdete v:
 
 ## Konfigurace
 
-`FlowableWorkerOptions` nastavuje identifikaci workera, téma (`topic`), velikost
+`FlowableWorkerOptions` nastavuje identifikaci workera, volitelný `tenantId`, téma (`topic`), velikost
 zámku (`lockDuration`) a další parametry. Vzorek konfigurace najdete v souboru
 `src/AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample/appsettings.json`.
 
@@ -36,6 +36,7 @@ globální pauza `PauseFromHour`/`PauseToHourExclusive`.
 ```json
 {
   "WorkerId": "example.worker",
+  "TenantId": "tenant-a",
   "Topic": "srd.call",
   "LockDuration": "PT30S",
   "MaxJobsPerTick": 5,

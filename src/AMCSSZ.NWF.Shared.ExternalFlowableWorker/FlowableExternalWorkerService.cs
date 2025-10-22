@@ -57,6 +57,7 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
         var maxJobs = _options.MaxJobsPerTick;
         var pollSeconds = _options.PollPeriodSeconds;
         var mdop = _options.MaxDegreeOfParallelism;
+        var tenantId = _options.TenantId;
         var timeZoneId = _options.TimeWindow.TimeZoneId;
         var tz = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
 
@@ -75,7 +76,7 @@ public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
                     continue;
                 }
 
-                var acquireRequest = new FlowableAcquireRequest(workerId, maxJobs, lockDuration, topic, true);
+                var acquireRequest = new FlowableAcquireRequest(workerId, maxJobs, lockDuration, topic, true, tenantId);
                 using var requestContent = JsonContent.Create(acquireRequest, options: SerializerOptions);
 
                 var swAcquire = Stopwatch.StartNew();
