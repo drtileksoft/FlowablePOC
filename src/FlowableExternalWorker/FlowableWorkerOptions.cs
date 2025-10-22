@@ -1,4 +1,4 @@
-namespace Flowable.ExternalWorker;
+namespace AMCSSZ.NWF.Shared.ExternalFlowableWorker;
 
 public sealed class FlowableWorkerOptions
 {

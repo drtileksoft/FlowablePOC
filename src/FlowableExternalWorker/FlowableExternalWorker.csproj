@@ -3,6 +3,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AMCSSZ.NWF.Shared.ExternalFlowableWorker</RootNamespace>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>Flowable.ExternalWorker</PackageId>
     <Version>0.1.0</Version>

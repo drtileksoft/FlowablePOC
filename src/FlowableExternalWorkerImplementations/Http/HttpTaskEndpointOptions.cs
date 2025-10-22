@@ -1,4 +1,4 @@
-namespace Flowable.ExternalWorkerImplementations.Http;
+namespace AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations.Http;
 
 public sealed class HttpTaskEndpointOptions
 {

@@ -3,7 +3,7 @@ using System.Net.Http;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Flowable.ExternalWorkerImplementations.Helpers;
+namespace AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations.Helpers;
 
 internal static class HttpResponseContentInspector
 {

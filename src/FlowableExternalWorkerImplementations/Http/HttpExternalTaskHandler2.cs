@@ -1,5 +1,5 @@
-using Flowable.ExternalWorker;
-using Flowable.ExternalWorkerImplementations.Helpers;
+using AMCSSZ.NWF.Shared.ExternalFlowableWorker;
+using AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations.Helpers;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Net;
@@ -8,7 +8,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Flowable.ExternalWorkerImplementations.Http;
+namespace AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations.Http;
 
 public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
 {

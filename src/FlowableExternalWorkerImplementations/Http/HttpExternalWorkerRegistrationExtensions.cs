@@ -1,9 +1,9 @@
 using System;
-using Flowable.ExternalWorker;
+using AMCSSZ.NWF.Shared.ExternalFlowableWorker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Flowable.ExternalWorkerImplementations.Http;
+namespace AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations.Http;
 
 public static class HttpExternalWorkerRegistrationExtensions
 {

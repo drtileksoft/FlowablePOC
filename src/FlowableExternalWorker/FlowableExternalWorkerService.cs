@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
-namespace Flowable.ExternalWorker;
+namespace AMCSSZ.NWF.Shared.ExternalFlowableWorker;
 
 public sealed class FlowableExternalWorkerService<THandler> : BackgroundService
     where THandler : IFlowableJobHandler
