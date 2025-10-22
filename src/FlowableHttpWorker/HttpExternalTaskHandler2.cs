@@ -58,6 +58,28 @@ public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
 
         var value = inputPayloadDict["payload"];
 
+        // deserialize value to Dictionary<string, object?>, its probably stringified json
+        if (value is not null)
+        {
+            if (JsonHelpers.TryGetInputPayload(value, out var inputPayload2, "inputPayload", _logger, HttpExternalTaskHandlerHelper.JsonOptions))
+            {
+                // inputPayload je JsonElement; mùže být Object/Array/Primitive
+                // Pro log: serializujeme pøes System.Text.Json
+                var payloadForLog = JsonSerializer.Serialize(inputPayload2, HttpExternalTaskHandlerHelper.JsonOptions);
+                _logger.LogInformation("Deserialized inputPayload: {Payload}", payloadForLog);
+
+                // Pokud chcete zkusit pøevést na konkrétní typ:
+                // var typed = inputPayload.Deserialize<MyDto>(HttpExternalTaskHandlerHelper.JsonOptions);
+                // _logger.LogInformation("Typed payload: {@Typed}", typed);
+            }
+            else
+            {
+                _logger.LogWarning("Failed to extract inputPayload from value.");
+            }
+        }
+
+
+
 
         var payload = new HttpExternalTaskPayload(
             _workerId,
