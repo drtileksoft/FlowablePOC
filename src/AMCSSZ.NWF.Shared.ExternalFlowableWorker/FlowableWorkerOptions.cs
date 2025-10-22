@@ -10,6 +10,9 @@ public sealed class FlowableWorkerOptions
 
     public string WorkerId { get; set; } = string.Empty;
 
+    public string? TenantId { get; set; }
+        = null;
+
     public string LockDuration { get; set; } = "PT30S";
 
     public int MaxJobsPerTick { get; set; } = 5;

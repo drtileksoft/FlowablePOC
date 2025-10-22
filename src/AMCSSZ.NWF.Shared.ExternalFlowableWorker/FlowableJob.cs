@@ -12,7 +12,8 @@ public sealed record FlowableAcquireRequest(
     [property: JsonPropertyName("maxJobs")] int MaxJobs,
     [property: JsonPropertyName("lockDuration")] string LockDuration,
     [property: JsonPropertyName("topic")] string Topic,
-    [property: JsonPropertyName("fetchVariables")] bool FetchVariables = true);
+    [property: JsonPropertyName("fetchVariables")] bool FetchVariables = true,
+    [property: JsonPropertyName("tenantId")] string? TenantId = null);
 
 public sealed record FlowableJob(
     [property: JsonPropertyName("id")] string Id,
