@@ -25,7 +25,7 @@ Klíčové třídy najdete v:
 
 `FlowableWorkerOptions` nastavuje identifikaci workera, téma (`topic`), velikost
 zámku (`lockDuration`) a další parametry. Vzorek konfigurace najdete v souboru
-`src/FlowableHttpWorker/appsettings.json`.
+`src/AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample/appsettings.json`.
 
 ```json
 {

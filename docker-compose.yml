@@ -70,9 +70,9 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  flowable-http-worker:
+  flowable-http-worker-usage-example:
     build: .
-    image: flowable-http-worker:latest
+    image: flowable-http-worker-usage-example:latest
     depends_on:
       deploy-process:
         condition: service_completed_successfully

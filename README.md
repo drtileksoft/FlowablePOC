@@ -8,10 +8,10 @@ showcase the integration patterns described in the `src` projects.
 
 | Path | Description |
 | --- | --- |
-| `src/FlowableExternalWorker` | Reusable library that wraps the Flowable external job REST API and orchestrates polling, retries and error handling for custom handlers. |
-| `src/FlowableExternalWorkerImplementations` | Collection of ready-made worker implementations (HTTP handlers, helper utilities and DI extensions). |
-| `src/FlowableHttpWorker` | Console worker host that references the implementations package and demonstrates how to register HTTP-based handlers. |
-| `src/HttpLogApi` | Minimal ASP.NET Core API used as a target endpoint when testing the HTTP workers. |
+| `src/AMCSSZ.NWF.Shared.ExternalFlowableWorker` | Reusable library that wraps the Flowable external job REST API and orchestrates polling, retries and error handling for custom handlers. |
+| `src/AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations` | Collection of ready-made worker implementations (HTTP handlers, helper utilities and DI extensions). |
+| `src/AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample` | Console worker host that references the implementations package and demonstrates how to register HTTP-based handlers. |
+| `src/AMCSSZ.NWF.Shared.HttpLogApi` | Minimal ASP.NET Core API used as a target endpoint when testing the HTTP workers. |
 | `srd-process.bpmn20.xml` | Sample process model that triggers the external task topic consumed by the workers. |
 
 Each project has its own README with additional details and configuration examples.
@@ -27,16 +27,16 @@ docker compose up -d --build
 Follow the worker logs while developing:
 
 ```bash
-docker compose logs -f flowable-http-worker
+docker compose logs -f flowable-http-worker-usage-example
 ```
 
 Useful lifecycle commands:
 
 ```bash
 # stop/start/restart only the worker container
-docker compose stop flowable-http-worker
-docker compose start flowable-http-worker
-docker compose restart flowable-http-worker
+docker compose stop flowable-http-worker-usage-example
+docker compose start flowable-http-worker-usage-example
+docker compose restart flowable-http-worker-usage-example
 
 # stop the entire stack
 docker compose down
@@ -139,6 +139,6 @@ a completion flag via process variables:
 </sequenceFlow>
 ```
 
-The worker sample in `src/FlowableHttpWorker/Program.cs` already completes acquired jobs.
+The worker sample in `src/AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample/Program.cs` already completes acquired jobs.
 If a handler throws `FlowableJobRetryException`, the worker will call `acquire/jobs/{job.id}/fail`
 and allow Flowable to retry the same task according to the configured back-off strategy.

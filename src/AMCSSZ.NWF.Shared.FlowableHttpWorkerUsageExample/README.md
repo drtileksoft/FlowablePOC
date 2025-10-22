@@ -1,9 +1,9 @@
 # Flowable HTTP Worker Sample Host
 
 Tento projekt slouží jako jednoduchá konzolová ukázka, jak hostovat Flowable external workery
-pomocí `Host.CreateApplicationBuilder` a knihovny `FlowableExternalWorker`.
+pomocí `Host.CreateApplicationBuilder` a knihovny `AMCSSZ.NWF.Shared.ExternalFlowableWorker`.
 Vlastní implementace HTTP handlerů je nyní umístěna v projektu
-[`FlowableExternalWorkerImplementations`](../FlowableExternalWorkerImplementations/README.md).
+[`AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations`](../AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations/README.md).
 
 ## Registrace workerů
 
@@ -15,7 +15,7 @@ builder.Services
     .AddHttpExternalTaskHandler2Worker(builder.Configuration);
 ```
 
-Tyto extension metody pochází z projektu `FlowableExternalWorkerImplementations`
+Tyto extension metody pochází z projektu `AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations`
 a zajistí registraci všech nezbytných služeb včetně `FlowableExternalWorkerService<THandler>`.
 
 ## Konfigurace

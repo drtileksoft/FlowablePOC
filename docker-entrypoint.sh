@@ -5,8 +5,8 @@ HTTP_LOG_API_PORT="${HTTP_LOG_API_PORT:-5005}"
 HTTP_LOG_API_URLS="http://0.0.0.0:${HTTP_LOG_API_PORT}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKER_DIR="${SCRIPT_DIR}/FlowableHttpWorker"
-API_DIR="${SCRIPT_DIR}/HttpLogApi"
+WORKER_DIR="${SCRIPT_DIR}/AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample"
+API_DIR="${SCRIPT_DIR}/AMCSSZ.NWF.Shared.HttpLogApi"
 
 cleanup() {
   if [[ -n "${HTTP_LOG_API_PID:-}" ]]; then
@@ -18,7 +18,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # Start the local HttpLogApi in the background so the worker can call it.
-(cd "$API_DIR" && dotnet HttpLogApi.dll --urls "${HTTP_LOG_API_URLS}") &
+(cd "$API_DIR" && dotnet AMCSSZ.NWF.Shared.HttpLogApi.dll --urls "${HTTP_LOG_API_URLS}") &
 HTTP_LOG_API_PID=$!
 
 # Give the API a moment to boot and fail fast if it exits immediately.
@@ -29,4 +29,4 @@ fi
 
 # Run the worker in the foreground (keeps the container alive).
 cd "$WORKER_DIR"
-dotnet FlowableHttpWorker.dll
+dotnet AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample.dll

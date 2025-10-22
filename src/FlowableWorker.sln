@@ -2,13 +2,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowableHttpWorker", "FlowableHttpWorker\FlowableHttpWorker.csproj", "{7E2112F1-4706-73C5-37B5-66131428C374}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample", "AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample\AMCSSZ.NWF.Shared.FlowableHttpWorkerUsageExample.csproj", "{7E2112F1-4706-73C5-37B5-66131428C374}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowableExternalWorker", "FlowableExternalWorker\FlowableExternalWorker.csproj", "{FD7AC2B1-74DD-4192-B77E-ACA520EF8E42}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AMCSSZ.NWF.Shared.ExternalFlowableWorker", "AMCSSZ.NWF.Shared.ExternalFlowableWorker\AMCSSZ.NWF.Shared.ExternalFlowableWorker.csproj", "{FD7AC2B1-74DD-4192-B77E-ACA520EF8E42}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FlowableExternalWorkerImplementations", "FlowableExternalWorkerImplementations\FlowableExternalWorkerImplementations.csproj", "{279AE960-DD3B-4DD3-AD99-8E37084EAC08}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations", "AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations\AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations.csproj", "{279AE960-DD3B-4DD3-AD99-8E37084EAC08}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HttpLogApi", "HttpLogApi\HttpLogApi.csproj", "{69B6FD8F-158F-5329-35FF-019263999FDD}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AMCSSZ.NWF.Shared.HttpLogApi", "AMCSSZ.NWF.Shared.HttpLogApi\AMCSSZ.NWF.Shared.HttpLogApi.csproj", "{69B6FD8F-158F-5329-35FF-019263999FDD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
