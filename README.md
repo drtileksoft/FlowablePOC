@@ -73,8 +73,7 @@ http://localhost:8090/flowable-rest/docs/?url=specfile/external-worker/flowable-
 Deploy the BPMN model bundled in this repository:
 
 ```bash
-curl -u rest-admin:test -X POST http://localhost:8090/flowable-rest/service/repository/deployments \ 
-     -H "Content-Type: multipart/form-data" -F "file=@srd-process.bpmn20.xml"
+curl -u rest-admin:test -X POST http://localhost:8090/flowable-rest/service/repository/deployments -H "Content-Type: multipart/form-data" -F "file=@srd-process.bpmn20.xml"
 ```
 
 Verify the deployment and list the definitions:
