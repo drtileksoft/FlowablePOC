@@ -1,7 +1,7 @@
 using System.Diagnostics;
+using System.Net;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Flowable.ExternalWorker;
 using Microsoft.Extensions.Logging;
 
@@ -81,60 +81,129 @@ public sealed class HttpExternalTaskHandler2 : IFlowableJobHandler
 
         _logger.LogInformation("Calling external service {Url}", _targetUrl);
         var stopwatch = Stopwatch.StartNew();
-        using var response = await httpClient.PostAsync(_targetUrl, content, cancellationToken);
-        stopwatch.Stop();
 
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            _logger.LogWarning(
-                "External call failed status={Status} elapsedMs={Elapsed}",
+            using var response = await httpClient.PostAsync(_targetUrl, content, cancellationToken);
+            stopwatch.Stop();
+
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            var elementIdentifier = context.Job.ElementId;
+            var contentType = response.Content.Headers.ContentType?.MediaType;
+            var trimmed = responseBody.Trim();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning(
+                    "External call failed status={Status} elapsedMs={Elapsed} response={Response}",
+                    (int)response.StatusCode,
+                    stopwatch.ElapsedMilliseconds,
+                    responseBody);
+
+                if ((int)response.StatusCode >= 500)
+                {
+                    // Dočasná chyba (např. HTTP 502/504) -> necháme Flowable úlohu retrynout.
+                    throw new FlowableJobRetryException(
+                        $"Call to {_targetUrl} failed with {(int)response.StatusCode}");
+                }
+
+                FlowableFinalFailureAction? finalAction = null;
+
+                if (response.StatusCode == HttpStatusCode.UnprocessableEntity
+                    && HttpExternalTaskHandlerHelper.TryParseJson(responseBody, out var errorJson)
+                    && errorJson.ValueKind == JsonValueKind.Object
+                    && errorJson.TryGetProperty("businessErrorCode", out var businessCodeElement)
+                    && businessCodeElement.ValueKind == JsonValueKind.String)
+                {
+                    var businessErrorCode = businessCodeElement.GetString() ?? "BUSINESS_ERROR";
+                    var businessErrorMessage = errorJson.TryGetProperty("businessErrorMessage", out var businessMessageElement)
+                        && businessMessageElement.ValueKind == JsonValueKind.String
+                            ? businessMessageElement.GetString()
+                            : "Business validation failed.";
+
+                    finalAction = FlowableFinalFailureAction.BpmnError(
+                        businessErrorCode,
+                        businessErrorMessage,
+                        new[]
+                        {
+                            new FlowableVariable("businessErrorPayload", errorJson, "json")
+                        });
+
+                    // Validovaná business chyba -> BPMN error, aby model přešel na boundary event.
+                    throw new FlowableJobFinalException(
+                        finalAction,
+                        $"Business validation failed with code '{businessErrorCode}'.");
+                }
+
+                var incidentVariables = new[]
+                {
+                    new FlowableVariable("httpStatus", (int)response.StatusCode, "integer"),
+                    new FlowableVariable("httpResponse", responseBody, "string"),
+                };
+
+                finalAction = new FlowableFinalFailureAction(
+                    FlowableFinalFailureActionType.Incident,
+                    $"HTTP call failed with status {(int)response.StatusCode}",
+                    incidentVariables);
+
+                // Neopravitelná technická chyba (např. 401/403) -> incident ukončí retry smyčku.
+                throw new FlowableJobFinalException(
+                    finalAction,
+                    $"Call to {_targetUrl} failed with {(int)response.StatusCode}");
+            }
+
+            var responseType = "string";
+            object responseValue = responseBody;
+
+            if (!string.IsNullOrEmpty(responseBody))
+            {
+                if (HttpExternalTaskHandlerHelper.IsJson(contentType, trimmed) && HttpExternalTaskHandlerHelper.TryParseJson(responseBody, out var jsonElement))
+                {
+                    responseType = "json";
+                    responseValue = jsonElement;
+                }
+                else if (HttpExternalTaskHandlerHelper.IsXml(contentType, trimmed))
+                {
+                    responseType = "xml";
+                }
+            }
+
+            Dictionary<string, string[]> headersDict = HttpExternalTaskHandlerHelper.GetResponseHeaders(response);
+
+            var variables = new List<FlowableVariable>
+            {
+                new($"{elementIdentifier}_statusCode", (int)response.StatusCode, "integer"),
+                new($"{elementIdentifier}_response_type", responseType, "string"),
+                new($"{elementIdentifier}_response", responseValue, responseType == "json" ? "json" : "string"),
+                new($"{elementIdentifier}_headers", headersDict, "json"),
+                new("JsonResponsePayload", responseValue, responseType == "json" ? "json" : "string"),
+            };
+
+            _logger.LogInformation("JsonResponsePayload: {JsonResponsePayload}", JsonSerializer.Serialize(responseValue, HttpExternalTaskHandlerHelper.JsonOptions));
+
+            _logger.LogInformation(
+                "External call succeeded status={Status} elapsedMs={Elapsed} worker={WorkerId}",
                 (int)response.StatusCode,
-                stopwatch.ElapsedMilliseconds);
+                stopwatch.ElapsedMilliseconds,
+                _workerId);
+
+            return new FlowableJobHandlerResult(variables);
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Timeout HTTP klienta -> dočasná chyba, dáme Flowable šanci úlohu zkusit znovu.
             throw new FlowableJobRetryException(
-                $"Call to {_targetUrl} failed with {(int)response.StatusCode}");
+                $"Call to {_targetUrl} timed out after {stopwatch.ElapsedMilliseconds} ms.",
+                ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            // Síťové výpadky (např. DNS, connection reset) bereme jako dočasné chyby vhodné k retry.
+            throw new FlowableJobRetryException(
+                $"Call to {_targetUrl} failed: {ex.Message}",
+                ex);
         }
 
-        var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-        var elementIdentifier = context.Job.ElementId;
-        var contentType = response.Content.Headers.ContentType?.MediaType;
-        var trimmed = responseBody.Trim();
-
-        var responseType = "string";
-        object responseValue = responseBody;
-
-        if (!string.IsNullOrEmpty(responseBody))
-        {
-            if (HttpExternalTaskHandlerHelper.IsJson(contentType, trimmed) && HttpExternalTaskHandlerHelper.TryParseJson(responseBody, out var jsonElement))
-            {
-                responseType = "json";
-                responseValue = jsonElement;
-            }
-            else if (HttpExternalTaskHandlerHelper.IsXml(contentType, trimmed))
-            {
-                responseType = "xml";
-            }
-        }
-
-        Dictionary<string, string[]> headersDict = HttpExternalTaskHandlerHelper.GetResponseHeaders(response);
-
-        var variables = new List<FlowableVariable>
-        {
-            new($"{elementIdentifier}_statusCode", (int)response.StatusCode, "integer"),
-            new($"{elementIdentifier}_response_type", responseType, "string"),
-            new($"{elementIdentifier}_response", responseValue, responseType == "json" ? "json" : "string"),
-            new($"{elementIdentifier}_headers", headersDict, "json"),
-            new("JsonResponsePayload", responseValue, responseType == "json" ? "json" : "string"),
-        };
-
-        _logger.LogInformation("JsonResponsePayload: {JsonResponsePayload}", JsonSerializer.Serialize(responseValue, HttpExternalTaskHandlerHelper.JsonOptions));
-
-        _logger.LogInformation(
-            "External call succeeded status={Status} elapsedMs={Elapsed} worker={WorkerId}",
-            (int)response.StatusCode,
-            stopwatch.ElapsedMilliseconds,
-            _workerId);
-
-        return new FlowableJobHandlerResult(variables);
     }
 
     public Task HandleFinalFailureAsync(
