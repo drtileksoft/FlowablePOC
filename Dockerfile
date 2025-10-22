@@ -3,13 +3,14 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Clean any local build outputs that might have been copied from the workspace.
-RUN for project in FlowableExternalWorker FlowableHttpWorker HttpLogApi; do \
+RUN for project in FlowableExternalWorker FlowableExternalWorkerImplementations FlowableHttpWorker HttpLogApi; do \
         rm -rf "./src/${project}/bin" "./src/${project}/obj"; \
     done
 
 # Restore all projects via the solution to leverage caching.
 COPY ./src/FlowableWorker.sln ./
 COPY ./src/FlowableExternalWorker/FlowableExternalWorker.csproj ./FlowableExternalWorker/
+COPY ./src/FlowableExternalWorkerImplementations/FlowableExternalWorkerImplementations.csproj ./FlowableExternalWorkerImplementations/
 COPY ./src/FlowableHttpWorker/FlowableHttpWorker.csproj ./FlowableHttpWorker/
 COPY ./src/HttpLogApi/HttpLogApi.csproj ./HttpLogApi/
 RUN dotnet restore FlowableWorker.sln

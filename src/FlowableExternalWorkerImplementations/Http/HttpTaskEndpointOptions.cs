@@ -1,4 +1,4 @@
-namespace FlowableHttpWorker;
+namespace Flowable.ExternalWorkerImplementations.Http;
 
 public sealed class HttpTaskEndpointOptions
 {

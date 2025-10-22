@@ -9,7 +9,8 @@ showcase the integration patterns described in the `src` projects.
 | Path | Description |
 | --- | --- |
 | `src/FlowableExternalWorker` | Reusable library that wraps the Flowable external job REST API and orchestrates polling, retries and error handling for custom handlers. |
-| `src/FlowableHttpWorker` | Console worker host that registers HTTP-based handlers (`HttpExternalTaskHandler` and `HttpExternalTaskHandler2`). Uses the shared library to talk to Flowable. |
+| `src/FlowableExternalWorkerImplementations` | Collection of ready-made worker implementations (HTTP handlers, helper utilities and DI extensions). |
+| `src/FlowableHttpWorker` | Console worker host that references the implementations package and demonstrates how to register HTTP-based handlers. |
 | `src/HttpLogApi` | Minimal ASP.NET Core API used as a target endpoint when testing the HTTP workers. |
 | `srd-process.bpmn20.xml` | Sample process model that triggers the external task topic consumed by the workers. |
 

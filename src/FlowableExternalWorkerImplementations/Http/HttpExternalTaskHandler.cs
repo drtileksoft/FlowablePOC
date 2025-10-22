@@ -1,10 +1,12 @@
 using System.Diagnostics;
+using System.Net.Http;
 using System.Text;
 using System.Text.Json;
 using Flowable.ExternalWorker;
+using Flowable.ExternalWorkerImplementations.Helpers;
 using Microsoft.Extensions.Logging;
 
-namespace FlowableHttpWorker;
+namespace Flowable.ExternalWorkerImplementations.Http;
 
 public sealed class HttpExternalTaskHandler : IFlowableJobHandler
 {
@@ -39,9 +41,11 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
 
         _logger.LogInformation($"Processing job {context.Job.Id} worker={_workerId} with payload={inputPayload}");
 
-        _logger.LogInformation($"Job variables: {JsonSerializer.Serialize(context.Variables, HttpExternalTaskHandlerHelper.JsonOptions)}");
+        _logger.LogInformation(
+            "Job variables: {Variables}",
+            JsonSerializer.Serialize(context.Variables, HttpResponseContentInspector.DefaultSerializerOptions));
 
-        var payload = new HttpExternalTaskPayload(
+        var payload = new HttpExternalTaskRequestPayload(
             _workerId,
             DateTimeOffset.UtcNow.ToString("o"),
             new
@@ -54,10 +58,12 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
             }
             );
 
-        _logger.LogDebug("Payload: {Payload}", JsonSerializer.Serialize(payload, HttpExternalTaskHandlerHelper.JsonOptions));
+        _logger.LogDebug(
+            "Payload: {Payload}",
+            JsonSerializer.Serialize(payload, HttpResponseContentInspector.DefaultSerializerOptions));
 
         using var content = new StringContent(
-            JsonSerializer.Serialize(payload, HttpExternalTaskHandlerHelper.JsonOptions),
+            JsonSerializer.Serialize(payload, HttpResponseContentInspector.DefaultSerializerOptions),
             Encoding.UTF8,
             "application/json");
 
@@ -86,29 +92,32 @@ public sealed class HttpExternalTaskHandler : IFlowableJobHandler
 
         if (!string.IsNullOrEmpty(responseBody))
         {
-            if (HttpExternalTaskHandlerHelper.IsJson(contentType, trimmed) && HttpExternalTaskHandlerHelper.TryParseJson(responseBody, out var jsonElement))
+            if (HttpResponseContentInspector.IsJsonPayload(contentType, trimmed)
+                && HttpResponseContentInspector.TryParseJson(responseBody, out var jsonElement))
             {
                 responseType = "json";
                 responseValue = jsonElement;
             }
-            else if (HttpExternalTaskHandlerHelper.IsXml(contentType, trimmed))
+            else if (HttpResponseContentInspector.IsXmlPayload(contentType, trimmed))
             {
                 responseType = "xml";
             }
         }
 
-        Dictionary<string, string[]> headersDict = HttpExternalTaskHandlerHelper.GetResponseHeaders(response);
+        var headers = HttpResponseContentInspector.ExtractResponseHeaders(response);
 
         var variables = new List<FlowableVariable>
         {
             new($"{elementIdentifier}_statusCode", (int)response.StatusCode, "integer"),
             new($"{elementIdentifier}_response_type", responseType, "string"),
             new($"{elementIdentifier}_response", responseValue, responseType == "json" ? "json" : "string"),
-            new($"{elementIdentifier}_headers", headersDict, "json"),
+            new($"{elementIdentifier}_headers", headers, "json"),
             new("JsonResponsePayload", responseValue, responseType == "json" ? "json" : "string"),
         };
 
-        _logger.LogInformation("JsonResponsePayload: {JsonResponsePayload}", JsonSerializer.Serialize(responseValue, HttpExternalTaskHandlerHelper.JsonOptions));
+        _logger.LogInformation(
+            "JsonResponsePayload: {JsonResponsePayload}",
+            JsonSerializer.Serialize(responseValue, HttpResponseContentInspector.DefaultSerializerOptions));
 
         _logger.LogInformation(
             "External call succeeded status={Status} elapsedMs={Elapsed} worker={WorkerId}",

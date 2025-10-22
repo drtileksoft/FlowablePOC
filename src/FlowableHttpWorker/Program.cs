@@ -1,4 +1,4 @@
-using FlowableHttpWorker;
+using Flowable.ExternalWorkerImplementations.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

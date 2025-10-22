@@ -3,9 +3,9 @@ using Flowable.ExternalWorker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace FlowableHttpWorker;
+namespace Flowable.ExternalWorkerImplementations.Http;
 
-public static class ServiceCollectionExtensions
+public static class HttpExternalWorkerRegistrationExtensions
 {
     private const string FlowableOptionsSectionName = "Flowable";
     private const string HttpOptionsSectionName = "Http";
