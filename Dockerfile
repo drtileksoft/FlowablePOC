@@ -21,6 +21,10 @@ ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1 \
     TZ=Europe/Prague \
     HTTP_LOG_API_PORT=5005
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /app/publish/FlowableHttpWorker ./FlowableHttpWorker/
 COPY --from=build /app/publish/HttpLogApi ./HttpLogApi/
 COPY docker-entrypoint.sh ./
