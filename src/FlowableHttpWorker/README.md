@@ -1,11 +1,12 @@
-# Flowable HTTP Worker Sample
+# Flowable HTTP Worker Sample Host
 
-Tento projekt ukazuje, jak pomocí knihovny `FlowableExternalWorker` vytvořit hostovanou
-.NET aplikaci, která zpracovává Flowable external jobs a předává je dál na HTTP endpoint.
+Tento projekt slouží jako jednoduchá konzolová ukázka, jak hostovat Flowable external workery
+pomocí `Host.CreateApplicationBuilder` a knihovny `FlowableExternalWorker`.
+Vlastní implementace HTTP handlerů je nyní umístěna v projektu
+[`FlowableExternalWorkerImplementations`](../FlowableExternalWorkerImplementations/README.md).
 
-## Spuštění
+## Registrace workerů
 
-Aplikace je konzolový host založený na `Host.CreateApplicationBuilder`.
 Registrace handlerů probíhá v [`Program.cs`](./Program.cs):
 
 ```csharp
@@ -14,12 +15,13 @@ builder.Services
     .AddHttpExternalTaskHandler2Worker(builder.Configuration);
 ```
 
-Každý handler má vlastní konfigurační sekci v `appsettings.json`. Knihovna `AddHttpWorker`
-načte nastavení a zaregistruje `FlowableExternalWorkerService<THandler>` s konkrétním handlerem.
+Tyto extension metody pochází z projektu `FlowableExternalWorkerImplementations`
+a zajistí registraci všech nezbytných služeb včetně `FlowableExternalWorkerService<THandler>`.
 
 ## Konfigurace
 
-Ukázková konfigurace pro `HttpExternalTaskHandler2`:
+Každý handler očekává vlastní sekci v `appsettings.json`. Ukázka konfigurace pro
+`HttpExternalTaskHandler2`:
 
 ```json
 "HttpExternalTaskHandler2": {
@@ -47,29 +49,8 @@ Ukázková konfigurace pro `HttpExternalTaskHandler2`:
 Sekce `Flowable` odpovídá `FlowableWorkerOptions` (identifikace workera, téma, retry),
 sekce `Http` pak specifikuje cílový endpoint a timeout.
 
-## Princip handleru
+## Spuštění
 
-[`HttpExternalTaskHandler2`](./HttpExternalTaskHandler2.cs) připraví JSON payload z Flowable
-proměnných a odešle jej na konfigurovaný HTTP endpoint. Na základě výsledku volání vrací proměnné,
-nebo vyhazuje specifické výjimky, které ovládají reakci Flowable enginu:
-
-- **Dočasné chyby** (timeout klienta, HTTP 5xx, síťové výpadky) vyvolají
-  `FlowableJobRetryException`, aby Flowable úlohu retryoval.
-- **Neopravitelné technické chyby** (např. 401/403) jsou nahlášeny jako incident přes
-  `FlowableFinalFailureAction.Incident(...)` uvnitř `FlowableJobFinalException`.
-- **Validované business chyby** – pokud backend vrátí `422` s JSONem obsahujícím
-  `businessErrorCode`, handler vytvoří `FlowableFinalFailureAction.BpmnError`. Flowable
-  pak aktivuje boundary error event a proces může pokračovat alternativní větví.
-
-Každý typ chyb je v kódu doplněn komentářem, který popisuje typický scénář vyvolání.
-
-## Přidání vlastního handleru
-
-1. Implementujte třídu `IFlowableJobHandler` a zaregistrujte ji v DI pomocí
-   `services.AddFlowableExternalWorker<THandler>(...)` nebo kopií metody `AddHttpWorker`.
-2. Přidejte sekci do `appsettings.json` se jménem handleru.
-3. V `Program.cs` zavolejte odpovídající extension metodu, která zaregistruje služby.
-
-Handler má k dispozici `FlowableJobContext` s proměnnými z BPMN procesu, může tedy
-připravit payload přesně podle potřeby. Výsledné proměnné se předávají do Flowable
-při dokončení jobu (`acquire/jobs/{id}/complete`).
+Projekt je čistý konzolový host. Spuštění probíhá standardním způsobem (`dotnet run`
+nebo v rámci docker-compose). Při startu se načte konfigurace, nakonfigurují loggery
+a zaregistrují se oba ukázkové workery z knihovny implementací.
