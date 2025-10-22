@@ -43,14 +43,14 @@ services:
       - ./addons:/additional-classpath:ro
     healthcheck:
       test:
-        - CMD-SHELL
+        - CMD
+        - bash
+        - -c
         - >-
-          sh -c '(command -v wget >/dev/null 2>&1 \
-            && wget --spider --quiet --timeout=5 --tries=1 --user=rest-admin --password=test \
-              http://127.0.0.1:8080/flowable-rest/service/management/engine) \
-            || (command -v curl >/dev/null 2>&1 \
-            && curl --fail --silent --user rest-admin:test \
-              http://127.0.0.1:8080/flowable-rest/service/management/engine >/dev/null)'
+          exec 3<>/dev/tcp/127.0.0.1/8080 &&
+          printf 'GET /flowable-rest/service/management/engine HTTP/1.1\r\nHost: 127.0.0.1\r\nAuthorization: Basic cmVzdC1hZG1pbjp0ZXN0\r\nConnection: close\r\n\r\n' >&3 &&
+          IFS=$'\r\n' read -r status <&3 &&
+          [[ "$status" == "HTTP/1.1 200"* ]]
       interval: 15s
       timeout: 10s
       retries: 20
