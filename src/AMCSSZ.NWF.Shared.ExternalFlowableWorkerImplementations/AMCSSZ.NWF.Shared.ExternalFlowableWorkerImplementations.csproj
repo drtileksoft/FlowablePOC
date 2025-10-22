@@ -4,7 +4,18 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations</RootNamespace>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>AMCSSZ.NWF.Shared.ExternalFlowableWorkerImplementations</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>CSSZ</Authors>
+    <Company>CSSZ</Company>
+    <Description>Implementations of Flowable external workers.</Description>
+    <PackageTags>Flowable;ExternalWorker;workflow;nwf</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />

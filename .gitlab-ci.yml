@@ -1,0 +1,70 @@
+# image je u Shell/PowerShell runneru ignorováno (nevadí ho tam nechat)
+image: mcr.microsoft.com/dotnet/sdk:9.0
+stages: [pack]
+
+variables:
+  DOTNET_NOLOGO: "true"
+  # volitelně si můžeš držet hlavní řadu:
+  MAJOR: "1"
+  MINOR: "0"
+  PATCH: "0"
+
+.add_gitlab_source: &add_gitlab_source
+  - $feed = "$env:CI_API_V4_URL/projects/$env:CI_PROJECT_ID/packages/nuget/index.json"
+  - |
+    if (dotnet nuget list source | Select-String -SimpleMatch ' gitlab ') {
+      dotnet nuget update source gitlab `
+        --source $feed `
+        --username gitlab-ci-token `
+        --password $env:CI_JOB_TOKEN `
+        --store-password-in-clear-text `
+        --valid-authentication-types "basic"
+    } else {
+      dotnet nuget add source $feed `
+        --name gitlab `
+        --username gitlab-ci-token `
+        --password $env:CI_JOB_TOKEN `
+        --store-password-in-clear-text `
+        --valid-authentication-types "basic"
+    }
+
+# RELEASE z tagu: taguj jako v1.2.3 (bez -dev, -rc ap.)
+pack_and_push_on_tag:
+  stage: pack
+  rules:
+    - if: '$CI_COMMIT_TAG'
+  script:
+    # verze = tag bez úvodního "v"
+    - $version = $env:CI_COMMIT_TAG.TrimStart('v')
+    - Write-Host "Packing RELEASE version $version"
+    - dotnet restore AMCSSZ.CodeLists/AMCSSZ.CodeLists.sln
+    - dotnet build   AMCSSZ.CodeLists/AMCSSZ.CodeLists.sln -c Release /p:Version=$version
+    - dotnet pack    AMCSSZ.CodeLists/AMCSSZ.CodeLists.Loader/AMCSSZ.CodeLists.Loader.csproj       -c Release /p:Version=$version --no-build -o .artifacts/nuget
+    - dotnet pack    AMCSSZ.CodeLists/AMCSSZ.CodeLists.Instances/AMCSSZ.CodeLists.Instances.csproj -c Release /p:Version=$version --no-build -o .artifacts/nuget
+    - *add_gitlab_source
+    # robustní push na Windows – rozbalíme wildcards
+    - Get-ChildItem ".artifacts/nuget/*.nupkg" | ForEach-Object { dotnet nuget push $_.FullName --source gitlab --skip-duplicate }
+  artifacts:
+    when: always
+    paths: [.artifacts/nuget/*.nupkg]
+    expire_in: 1 week
+
+# RELEASE z main: čtyřsegmentová stabilní verze 1.0.0.<pipeline>
+pack_and_push_on_main:
+  stage: pack
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+  script:
+    # stabilní verze bez sufixu; pipeline IID jako revize
+    - $version = "$env:MAJOR.$env:MINOR.$env:PATCH.$env:CI_PIPELINE_IID"
+    - Write-Host "Packing RELEASE version $version (main)"
+    - dotnet restore AMCSSZ.CodeLists/AMCSSZ.CodeLists.sln
+    - dotnet build   AMCSSZ.CodeLists/AMCSSZ.CodeLists.sln -c Release /p:Version=$version
+    - dotnet pack    AMCSSZ.CodeLists/AMCSSZ.CodeLists.Loader/AMCSSZ.CodeLists.Loader.csproj       -c Release /p:Version=$version --no-build -o .artifacts/nuget
+    - dotnet pack    AMCSSZ.CodeLists/AMCSSZ.CodeLists.Instances/AMCSSZ.CodeLists.Instances.csproj -c Release /p:Version=$version --no-build -o .artifacts/nuget
+    - *add_gitlab_source
+    - Get-ChildItem ".artifacts/nuget/*.nupkg" | ForEach-Object { dotnet nuget push $_.FullName --source gitlab --skip-duplicate }
+  artifacts:
+    when: always
+    paths: [.artifacts/nuget/*.nupkg]
+    expire_in: 1 week
